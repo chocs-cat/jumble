@@ -122,8 +122,22 @@ The header shows the alphabet size and strength for the controls as they
 stand, updated as you change them. When the controls can't produce strings, a
 banner under the header says why, with the same message the command line
 would print, and the strength disappears until you fix them. Changing a
-control leaves the strings alone; `g` jumbles a new batch with the current
-controls (not while the banner shows), and `q` quits.
+control leaves the strings alone; only a jumble replaces them. The list shows
+the first 1000 strings and says how many more there are; copying all takes
+every one.
+
+The keys are listed in the footer:
+
+| Key | Action |
+|---|---|
+| `g` | jumble a new batch with the current controls (not while the banner shows) |
+| `c` | copy the string under the cursor |
+| `a` | copy all strings, one per line |
+| `q` | quit |
+
+Focus starts on the strings, so the keys work. In a text box, `enter`
+jumbles (as `g` does) and returns to the strings, and `escape` returns without
+jumbling. While the banner shows, `c` and `a` copy the last batch.
 
 ## Development
 

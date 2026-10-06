@@ -4,13 +4,17 @@ from importlib.metadata import version
 from typing import ClassVar
 
 from textual.app import App, ComposeResult
-from textual.binding import BindingType
+from textual.binding import Binding, BindingType
 from textual.containers import Grid, Horizontal, VerticalScroll
 from textual.widgets import Checkbox, Footer, Header, Input, OptionList, SelectionList, Static
+from textual.widgets.option_list import Option
 
 from jumble.generate import CHARSETS, JumbleError, Settings, generate, strength, strength_line
 
 DEFAULTS = Settings()
+
+# The results pane lists at most this many strings (§7.1, DEC-11).
+SHOWN = 1000
 
 # The four options' checkboxes: widget ID, label (§7.1), and setting name.
 OPTIONS = (
@@ -49,7 +53,10 @@ class JumbleApp(App[None]):
     """
     BINDINGS: ClassVar[list[BindingType]] = [
         ("g", "jumble", "Jumble"),
+        ("c", "copy", "Copy"),
+        ("a", "copy_all", "Copy all"),
         ("q", "quit", "Quit"),
+        Binding("escape", "focus_results", show=False),
     ]
 
     def __init__(self) -> None:
@@ -122,9 +129,42 @@ class JumbleApp(App[None]):
     def on_selection_list_selected_changed(self) -> None:
         self.check()
 
+    def on_input_submitted(self) -> None:
+        # `enter` in an input jumbles, as `g` would, and leaves the input (§7.2, DEC-12).
+        self.action_jumble()
+        self.action_focus_results()
+
+    def action_focus_results(self) -> None:
+        self.query_one("#results", OptionList).focus()
+
     def action_jumble(self) -> None:
         """Generate with the controls and replace the results; nothing while invalid."""
         if not self.valid:
             return
         self.strings = generate(self.settings())
-        self.query_one("#results", OptionList).set_options(self.strings)
+        rows: list[str | Option] = list(self.strings[:SHOWN])
+        if len(self.strings) > SHOWN:
+            # Disabled, so the cursor skips it (§7.1, DEC-11).
+            more = len(self.strings) - SHOWN
+            rows.append(Option(f"… and {more} more (s saves all)", disabled=True))
+        pane = self.query_one("#results", OptionList)
+        pane.set_options(rows)
+        pane.highlighted = 0
+
+    # Copying uses the last jumble's strings, valid controls or not; before
+    # any jumble there is nothing to copy (§7.1, §7.2).
+
+    def action_copy(self) -> None:
+        index = self.query_one("#results", OptionList).highlighted
+        if not self.strings or index is None:
+            return
+        self.copy_to_clipboard(self.strings[index])
+        self.notify("Copied")
+
+    def action_copy_all(self) -> None:
+        """Copy every string, those past the shown 1000 too (DEC-11)."""
+        if not self.strings:
+            return
+        self.copy_to_clipboard("\n".join(self.strings))
+        n = len(self.strings)
+        self.notify(f"Copied {n} string" if n == 1 else f"Copied {n} strings")

@@ -1,5 +1,6 @@
 from importlib.metadata import version
 
+import pytest
 from textual.pilot import Pilot
 from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
 
@@ -163,3 +164,139 @@ async def test_option_checkboxes_start_off() -> None:
             assert app.query_one(f"#{wid}", Checkbox).value is False
         assert app.query_one("#length", Input).value == "16"
         assert app.query_one("#count", Input).value == "1"
+
+
+class Recorder:
+    """Records what the app copies and the toasts it shows."""
+
+    def __init__(self, app: JumbleApp, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.copied: list[str] = []
+        self.toasts: list[str] = []
+        monkeypatch.setattr(app, "copy_to_clipboard", self.copied.append)
+        monkeypatch.setattr(app, "notify", lambda message, **_: self.toasts.append(message))
+
+
+async def test_more_than_1000_strings(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await set_value(pilot, "#count", "1500")
+        await pilot.press("g")
+        await pilot.pause()
+        rows = results(app)
+        assert len(rows) == 1001
+        assert rows[-1] == "… and 500 more (s saves all)"
+        assert rows[:1000] == app.strings[:1000]
+        pane = app.query_one("#results", OptionList)
+        assert pane.highlighted == 0
+        await pilot.press("end")
+        assert pane.highlighted == 999
+        await pilot.press("down")
+        assert pane.highlighted != 1000
+        await pilot.press("end")
+        await pilot.press("c")
+        assert record.copied == [app.strings[999]]
+        await pilot.press("a")
+        assert record.copied[-1].split("\n") == app.strings
+        assert len(app.strings) == 1500
+        assert record.toasts == ["Copied", "Copied 1500 strings"]
+
+
+async def test_c_copies_the_highlighted_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await set_value(pilot, "#count", "3")
+        await pilot.press("g", "down", "c")
+        assert record.copied == [app.strings[1]]
+        assert record.toasts == ["Copied"]
+
+
+async def test_jumble_moves_the_cursor_to_the_top() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        await set_value(pilot, "#count", "3")
+        await pilot.press("g", "down", "down", "g")
+        assert app.query_one("#results", OptionList).highlighted == 0
+
+
+async def test_copy_one_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("a")
+        assert record.copied == app.strings
+        assert record.toasts == ["Copied 1 string"]
+
+
+async def test_copying_while_invalid_uses_the_last_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await set_value(pilot, "#count", "2")
+        await pilot.press("g")
+        last = list(app.strings)
+        await set_value(pilot, "#length", "0")
+        app.query_one("#results", OptionList).focus()
+        await pilot.press("g", "a", "c")
+        assert record.copied == ["\n".join(last), last[0]]
+
+
+async def test_keys_before_any_strings_do_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    # Invalid from the start, so the start-up jumble makes nothing (§7.2).
+    monkeypatch.setattr(app, "check", lambda: setattr(app, "valid", False))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("c", "a")
+        assert (record.copied, record.toasts) == ([], [])
+        assert results(app) == []
+
+
+async def test_focus_starts_on_the_results() -> None:
+    app = JumbleApp()
+    async with app.run_test():
+        assert app.focused is app.query_one("#results", OptionList)
+
+
+async def test_enter_in_an_input_jumbles_and_leaves_it() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        before = results(app)
+        app.query_one("#length", Input).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert results(app) != before
+        assert app.focused is app.query_one("#results", OptionList)
+
+
+async def test_enter_while_invalid_only_leaves_the_input() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        before = results(app)
+        await set_value(pilot, "#length", "0")
+        app.query_one("#length", Input).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert results(app) == before
+        assert app.focused is app.query_one("#results", OptionList)
+
+
+async def test_escape_leaves_an_input_without_jumbling() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        before = results(app)
+        app.query_one("#custom", Input).focus()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert results(app) == before
+        assert app.focused is app.query_one("#results", OptionList)
+
+
+async def test_footer_keys() -> None:
+    app = JumbleApp()
+    async with app.run_test():
+        # Results-pane focus, as at start: the screen's bindings, not an input's.
+        bindings = app.screen.active_bindings.values()
+        shown = [(a.binding.key, a.binding.description) for a in bindings if a.binding.show]
+        assert shown == [("g", "Jumble"), ("c", "Copy"), ("a", "Copy all"), ("q", "Quit")]
