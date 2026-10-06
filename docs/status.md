@@ -18,14 +18,15 @@ Last review: P0001-C03, 2026-10-06.
 - P0001-C04 (D3, the rest: give-up toast, starting values from `jumble …
   tui`, `s`, screenshot) was cut on 2026-10-06 and is ready for an executor.
   D4 and D5 remain after it.
-- **Do next:** `/relay-execute` to build P0001-C04.
+- P0001-C04 was executed on 2026-10-07 (PR #11) and awaits review.
+- **Do next:** `/relay-next` to review P0001-C04.
 
 ## In flight
 
 - **Chunk:** P0001-C04
-- **State:** executing
+- **State:** awaiting review
 - **Branch:** `chunk/p0001-c04`
-- **Pull request:** `#11` (draft)
+- **Pull request:** `#11` (ready)
 - **Units committed:** a, b, c
 
 (Fixed shape. `State` ∈ `ready for an executor` · `executing` ·
