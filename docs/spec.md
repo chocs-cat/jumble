@@ -147,14 +147,17 @@ jumble [options] tui      open the TUI, starting from these options (§7)
 | `--strength` | also print the strength line to stderr (§4.3) |
 | `--no-config` | ignore the settings file (§5) |
 
-`-o`, `--json`, and `--strength` are errors with `tui` (§6).
+`-o`, `--json`, and `--strength` are errors with `tui` (§6): the message is
+`OPTION can't be used with tui`, naming the first one given of `--output`,
+`--json`, and `--strength`, in that order, by its long name.
 
 ### 4.1 Output
 
 jumble generates every string before writing anything, so a failed run writes
 nothing and never leaves a partial file (DEC-8). Lines output is each string
-followed by `\n`, UTF-8. `-o FILE` creates or overwrites `FILE`, as shell
-redirection would.
+followed by `\n`. Output is UTF-8 on stdout as in a file, whatever the
+locale's encoding. `-o FILE` creates or overwrites `FILE`, as shell
+redirection would; `-o -` is stdout.
 
 ### 4.2 JSON
 
@@ -172,13 +175,23 @@ One object, followed by `\n`, to stdout or the `-o` file:
 }
 ```
 
-`settings` holds the effective settings (§5.2), with `charsets` in canonical
-order. `strength_is_bound` is true when `each` is on. Errors are not JSON.
+The keys come in the order shown. `alphabet_size` is *A*; `strength_bits` is
+the §3.5 strength rounded to one decimal place (Python's `round(bits, 1)`);
+`strength_is_bound` is true when `each` is on. `settings` holds the effective
+settings (§5.2): `charsets` lists each chosen named set once, in canonical
+order (an empty list when only `custom` chooses characters), and `custom` is
+the string as given, before §2.3's deduplication. The object is written with
+two-space indentation and non-ASCII characters as themselves, not `\u`
+escapes (Python's `json.dumps(…, indent=2, ensure_ascii=False)`). Errors are
+not JSON.
 
 ### 4.3 Strength line
 
 `62 characters · 95.3 bits per string`, or with `each` on,
-`62 characters · at most 95.3 bits per string`.
+`62 characters · at most 95.3 bits per string`; `1 character · …` when *A*
+is 1. The bits are written with exactly one decimal place. `--strength`
+writes this line and `\n` to stderr after the output is written, and only
+when the run succeeds. The TUI's subtitle uses the same wording (§7.1).
 
 ## 5. Settings file
 
@@ -234,7 +247,9 @@ The command line prints `jumble: error: MESSAGE` to stderr and exits 2 for any
 of these, for settings-file errors, and for misused options. For the messages
 above and settings-file errors that line is the whole output; for misused
 options argparse's usage line comes first, as argparse prints it. A file it
-cannot write is `jumble: error: can't write FILE: REASON`, exit 1.
+cannot write is `jumble: error: can't write FILE: REASON`, exit 1, where
+`FILE` is the path as given and `REASON` is the operating system's error
+text (Python's `OSError.strerror`, for example `Permission denied`).
 
 ## 7. Terminal UI
 

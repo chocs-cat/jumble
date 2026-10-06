@@ -92,6 +92,11 @@ Releases are automated with release-please, from Conventional Commits.
   keys must not leave an input focused.
 - Tests never touch the real settings file: point `$JUMBLE_CONFIG` at a
   `tmp_path` file (monkeypatch) in any test that loads or saves settings.
+- Judge the gate by its exit code: don't pipe `make check` into `tail` or
+  `head`, which hides a failure. After a hand mutation check, clear
+  `__pycache__` (or set `PYTHONDONTWRITEBYTECODE=1`) before the next run:
+  a same-size edit restored within a second leaves a stale `.pyc` that
+  Python still loads.
 
 ## Relay workflow
 

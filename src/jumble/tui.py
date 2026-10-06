@@ -7,7 +7,10 @@ from textual.binding import BindingType
 from textual.containers import Horizontal
 from textual.widgets import Button, Checkbox, Footer, Input, Static
 
-from jumble.generate import CHARSETS, generate
+from jumble.generate import Settings, generate
+
+# The sets offered here until D3 rebuilds the TUI; all eighteen would not fit the row.
+SETS = ("lower", "upper", "digits", "symbols")
 
 
 class JumbleApp(App[None]):
@@ -31,7 +34,7 @@ class JumbleApp(App[None]):
         yield Static(id="result")
         with Horizontal(id="controls"):
             yield Input("16", id="length", type="integer", tooltip="Length")
-            for name in CHARSETS:
+            for name in SETS:
                 yield Checkbox(name, name != "symbols", id=name)
             yield Checkbox("no look-alikes", id="no-ambiguous")
             yield Button("Jumble", id="jumble", variant="primary")
@@ -50,11 +53,12 @@ class JumbleApp(App[None]):
     def action_jumble(self) -> None:
         error = self.query_one("#error", Static)
         try:
-            text = generate(
-                int(self.query_one("#length", Input).value or 0),
-                [name for name in CHARSETS if self.query_one(f"#{name}", Checkbox).value],
-                exclude_ambiguous=self.query_one("#no-ambiguous", Checkbox).value,
+            settings = Settings(
+                length=int(self.query_one("#length", Input).value or 0),
+                charsets=tuple(n for n in SETS if self.query_one(f"#{n}", Checkbox).value),
+                no_ambiguous=self.query_one("#no-ambiguous", Checkbox).value,
             )
+            text = generate(settings)[0]
         except ValueError as e:
             error.update(str(e))
             return
