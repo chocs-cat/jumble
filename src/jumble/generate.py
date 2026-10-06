@@ -145,6 +145,18 @@ class Strength(NamedTuple):
     """True when `each` is on: the bits are then an upper bound (DEC-7)."""
 
 
+def strength_line(strength: Strength) -> str:
+    """The strength line of §4.3, shared by `--strength` and the TUI's subtitle.
+
+    For example `62 characters · 95.3 bits per string`, with `at most` before
+    the bits when they are a bound.
+    """
+    size = strength.alphabet_size
+    chars = "1 character" if size == 1 else f"{size} characters"
+    bound = "at most " if strength.is_bound else ""
+    return f"{chars} · {bound}{strength.bits:.1f} bits per string"
+
+
 def _possible(size: int, settings: Settings) -> int:
     """The number of possible strings, P (§3.5); ignores `each` (DEC-7)."""
     if settings.no_repeat:

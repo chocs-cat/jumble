@@ -258,3 +258,52 @@ def test_json_to_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
 def test_json_errors_are_plain(capsys: pytest.CaptureFixture[str]) -> None:
     code, lines, err = run(["--json", "-n", "0"], capsys)
     assert (code, lines, err) == (2, [], "jumble: error: length must be at least 1\n")
+
+
+def test_strength_goes_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:
+    code, lines, err = run(["--strength", "-c", "3"], capsys)
+    assert code == 0
+    assert [len(line) for line in lines] == [16, 16, 16]
+    assert err == "62 characters · 95.3 bits per string\n"
+
+
+def test_strength_with_output_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    out = tmp_path / "out.txt"
+    code, lines, err = run(["--strength", "-e", "-o", str(out)], capsys)
+    assert (code, lines) == (0, [])
+    assert err == "62 characters · at most 95.3 bits per string\n"
+    assert len(out.read_bytes()) == 17
+
+
+def test_strength_not_printed_on_error(capsys: pytest.CaptureFixture[str]) -> None:
+    code, lines, err = run(["--strength", "-n", "0"], capsys)
+    assert (code, lines, err) == (2, [], "jumble: error: length must be at least 1\n")
+
+
+@pytest.mark.parametrize(
+    ("argv", "option"),
+    [
+        (["-o", "x", "tui"], "--output"),
+        (["-o", "-", "tui"], "--output"),
+        (["--json", "tui"], "--json"),
+        (["--strength", "tui"], "--strength"),
+        (["--strength", "--json", "tui"], "--json"),
+        (["--strength", "--json", "-o", "x", "tui"], "--output"),
+    ],
+)
+def test_misuse_with_tui(
+    argv: list[str],
+    option: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exit_info:
+        main(argv)
+    assert exit_info.value.code == 2
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.startswith("usage:")
+    assert err.endswith(f"jumble: error: {option} can't be used with tui\n")
+    assert list(tmp_path.iterdir()) == []

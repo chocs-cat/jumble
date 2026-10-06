@@ -10,9 +10,11 @@ from jumble.generate import (
     LOOK_ALIKES,
     JumbleError,
     Settings,
+    Strength,
     generate,
     settings_dict,
     strength,
+    strength_line,
 )
 
 DEFAULTS = Settings()
@@ -34,7 +36,7 @@ def parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULTS.count,
         metavar="N",
-        help=f"how many strings to print (default {DEFAULTS.count})",
+        help=f"how many strings (default {DEFAULTS.count})",
     )
     # No argparse choices: validation reports unknown and empty names (§2.2, §6).
     p.add_argument(
@@ -78,8 +80,15 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write one JSON object with the strings, their strength, and the settings used",
     )
+    p.add_argument(
+        "--strength",
+        action="store_true",
+        help="also print the alphabet size and bits per string to stderr",
+    )
     sub = p.add_subparsers(dest="command")
-    sub.add_parser("tui", help="open the interactive generator")
+    sub.add_parser(
+        "tui", help="open the interactive generator (not with --output, --json, or --strength)"
+    )
     return p
 
 
@@ -102,8 +111,18 @@ def settings_from(args: argparse.Namespace) -> Settings:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    p = parser()
+    args = p.parse_args(argv)
     if args.command == "tui":
+        # Before the TUI starts or any file is touched; -o - counts as given (§4, §6).
+        misused = (
+            ("--output", args.output is not None),
+            ("--json", args.json),
+            ("--strength", args.strength),
+        )
+        for option, given in misused:
+            if given:
+                p.error(f"{option} can't be used with tui")
         from jumble.tui import JumbleApp
 
         JumbleApp().run()
@@ -117,19 +136,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         # The message is the whole output, with no usage line (§6).
         print(f"jumble: error: {e}", file=sys.stderr)
         return 2
-    text = json_output(strings, settings) if args.json else "".join(f"{s}\n" for s in strings)
+    # After generate, so a failed run's error is generate's.
+    st = strength(settings)
+    text = json_output(strings, settings, st) if args.json else "".join(f"{s}\n" for s in strings)
     data = text.encode()
     try:
         write_output(args.output, data)
     except OSError as e:
         print(f"jumble: error: can't write {args.output}: {e.strerror}", file=sys.stderr)
         return 1
+    if args.strength:
+        # After the output, and only for a run that succeeded (§4.3).
+        print(strength_line(st), file=sys.stderr)
     return 0
 
 
-def json_output(strings: list[str], settings: Settings) -> str:
-    """The §4.2 object for `strings`, drawn from `settings`, and a final newline."""
-    st = strength(settings)
+def json_output(strings: list[str], settings: Settings, st: Strength) -> str:
+    """The §4.2 object for `strings`, drawn from `settings` of strength `st`, and a newline."""
     obj = {
         "strings": strings,
         "alphabet_size": st.alphabet_size,

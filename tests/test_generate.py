@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from jumble import JumbleError, Settings, generate
-from jumble.generate import CHARSETS, settings_dict, validate
+from jumble.generate import CHARSETS, settings_dict, strength, strength_line, validate
 
 
 def alphabet(settings: Settings) -> set[str]:
@@ -142,3 +142,16 @@ def test_settings_dict() -> None:
     assert list(d) == [f.name for f in fields(Settings)]
     assert d["charsets"] == ["lower", "box"]
     assert (d["custom"], d["each"], d["length"]) == ("zz", True, 16)
+
+
+@pytest.mark.parametrize(
+    ("settings", "line"),
+    [
+        (Settings(), "62 characters · 95.3 bits per string"),
+        (Settings(each=True), "62 characters · at most 95.3 bits per string"),
+        (Settings(charsets=("space",)), "1 character · 0.0 bits per string"),
+        (Settings(charsets=(), custom="ab", length=3), "2 characters · 3.0 bits per string"),
+    ],
+)
+def test_strength_line(settings: Settings, line: str) -> None:
+    assert strength_line(strength(settings)) == line

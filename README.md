@@ -40,6 +40,7 @@ jumble tui                      # pick the length and character sets interactive
 | `-u`, `--unique` | no string twice in the output |
 | `-o`, `--output FILE` | write to `FILE`, created or overwritten, instead of stdout; `-` means stdout |
 | `--json` | write one JSON object instead of lines (below) |
+| `--strength` | also print the alphabet size and bits per string to stderr |
 
 With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 `digits`. A character that is in more than one chosen set counts once, in the
@@ -82,6 +83,11 @@ $ jumble --json -n 8 -c 2 -s digits,lower
 ```
 
 Errors are never JSON.
+
+`--strength` prints a line such as `62 characters · 95.3 bits per string` to
+stderr once the output is written (`at most` before the bits with `-e`), so it
+stays out of a pipe or `-o` file. `-o`, `--json`, and `--strength` don't go
+with `tui`.
 
 | Set | Characters | Size |
 |---|---|---|
