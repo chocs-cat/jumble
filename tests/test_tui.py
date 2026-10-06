@@ -4,7 +4,8 @@ import pytest
 from textual.pilot import Pilot
 from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
 
-from jumble.generate import CHARSETS
+from jumble import tui
+from jumble.generate import CHARSETS, JumbleError
 from jumble.tui import JumbleApp
 
 
@@ -172,8 +173,13 @@ class Recorder:
     def __init__(self, app: JumbleApp, monkeypatch: pytest.MonkeyPatch) -> None:
         self.copied: list[str] = []
         self.toasts: list[str] = []
+        self.severities: list[str] = []
         monkeypatch.setattr(app, "copy_to_clipboard", self.copied.append)
-        monkeypatch.setattr(app, "notify", lambda message, **_: self.toasts.append(message))
+        monkeypatch.setattr(app, "notify", self.notify)
+
+    def notify(self, message: str, *, severity: str = "information", **_: object) -> None:
+        self.toasts.append(message)
+        self.severities.append(severity)
 
 
 async def test_more_than_1000_strings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -300,3 +306,44 @@ async def test_footer_keys() -> None:
         bindings = app.screen.active_bindings.values()
         shown = [(a.binding.key, a.binding.description) for a in bindings if a.binding.show]
         assert shown == [("g", "Jumble"), ("c", "Copy"), ("a", "Copy all"), ("q", "Quit")]
+
+
+GAVE_UP = "gave up after 100000 draws with 9 of 10 unique strings"
+
+
+def give_up(_settings: object) -> list[str]:
+    raise JumbleError(GAVE_UP)
+
+
+async def test_a_give_up_is_a_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await set_value(pilot, "#count", "3")
+        await pilot.press("g", "down")
+        before, strings = results(app), list(app.strings)
+        monkeypatch.setattr(tui, "generate", give_up)
+        await pilot.press("g")
+        await pilot.pause()
+        assert app.is_running
+        assert results(app) == before
+        assert app.strings == strings
+        assert app.query_one("#results", OptionList).highlighted == 1
+        assert banner(app) is None
+        assert (record.toasts, record.severities) == ([GAVE_UP], ["error"])
+
+
+async def test_a_give_up_through_enter_is_a_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        before = results(app)
+        monkeypatch.setattr(tui, "generate", give_up)
+        app.query_one("#length", Input).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.is_running
+        assert results(app) == before
+        assert app.query_one("#results", OptionList).highlighted == 0
+        assert banner(app) is None
+        assert (record.toasts, record.severities) == ([GAVE_UP], ["error"])

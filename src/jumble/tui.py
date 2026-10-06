@@ -141,7 +141,14 @@ class JumbleApp(App[None]):
         """Generate with the controls and replace the results; nothing while invalid."""
         if not self.valid:
             return
-        self.strings = generate(self.settings())
+        try:
+            strings = generate(self.settings())
+        except JumbleError as e:
+            # Only `unique`'s give-up gets past `check`: a toast, and the last
+            # result, rows, and cursor stay; the banner is for the controls (§7.1, DEC-15).
+            self.notify(str(e), severity="error")
+            return
+        self.strings = strings
         rows: list[str | Option] = list(self.strings[:SHOWN])
         if len(self.strings) > SHOWN:
             # Disabled, so the cursor skips it (§7.1, DEC-11).
