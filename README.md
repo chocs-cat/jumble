@@ -112,7 +112,18 @@ with `tui`.
 | `currency` | `¢£¥€₹₽₩₪₺₿₫₱` | 12 |
 | `box` | box drawing and block elements ─…▟ | 160 |
 
-In the TUI, `g` jumbles again, `c` copies the result, and `q` quits.
+### The TUI
+
+`jumble tui` opens the generator in the terminal. On the left are the
+controls: length and count, every character set in the table above to check
+or uncheck, custom characters, and the four options (No look-alikes, One from
+each set, No repeats, All unique). On the right are the strings, one per row.
+The header shows the alphabet size and strength for the controls as they
+stand, updated as you change them. When the controls can't produce strings, a
+banner under the header says why, with the same message the command line
+would print, and the strength disappears until you fix them. Changing a
+control leaves the strings alone; `g` jumbles a new batch with the current
+controls (not while the banner shows), and `q` quits.
 
 ## Development
 
