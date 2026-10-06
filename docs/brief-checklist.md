@@ -31,4 +31,17 @@ the product of that procedure has come out wrong.
 
 ## The catalogue
 
-None yet.
+### §1. The brief contradicts a decision it cites
+
+**Shape:** a *Kickoff notes* or *Build* line states a rule and cites two
+decisions for it, while one of them says something else. The executor has to
+pick a side, and whichever it picks, a cited authority is wrong.
+
+**Check:** for every decision a brief cites, read the entry's text, not only
+its title, against the sentence that cites it. When an entry disagrees with
+the brief or with another entry, amend the entry in place before cutting.
+
+**Provenance:** P0001-C01. Its kickoff notes said every draw goes through
+`secrets.randbelow`, with no `secrets.choice`, citing DEC-1 and DEC-6; DEC-1
+said characters are drawn "with `secrets.choice`". The executor followed
+DEC-6 and reported it; DEC-1 was amended in the review.

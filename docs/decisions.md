@@ -22,11 +22,16 @@ out and the reason they lost.
 
 ## DEC-1: Randomness comes from `secrets` (2026-10)
 
-jumble's strings are used as passwords and tokens, so every character is drawn
-with `secrets.choice`. The `random` module is ruled out even for speed or
+jumble's strings are used as passwords and tokens, so every draw, choice,
+sample, and shuffle comes from the `secrets` module, built on
+`secrets.randbelow` (DEC-6). The `random` module is ruled out even for speed or
 seeding in tests: its generator is predictable, and one stray use would make
 output unfit for secrets without any visible sign. Tests check lengths and
 alphabets rather than exact values.
+
+Amended 2026-10 at the review of P0001-C01: the first sentence named
+`secrets.choice`, which contradicted DEC-6 and spec §3; the rule (`secrets`,
+never `random`) is unchanged.
 
 *Where:* AGENTS.md (Conventions), `src/jumble/generate.py`.
 
