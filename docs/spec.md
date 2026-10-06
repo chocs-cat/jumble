@@ -212,22 +212,48 @@ when the run succeeds. The TUI's subtitle uses the same wording (§7.1).
 
 ### 5.1 Location and format
 
-`$JUMBLE_CONFIG` if set, else `$XDG_CONFIG_HOME/jumble/config.toml`, else
-`~/.config/jumble/config.toml`, on macOS too (DEC-10). It is TOML with the
-setting names of §1 as top-level keys; every key is optional. A missing file
-means built-in defaults. An unknown key, a wrong type, or a value the rules
-reject is an error naming the file and the key (§6).
+`$JUMBLE_CONFIG` if set and not empty, as given (a relative path is relative
+to the working directory); else `$XDG_CONFIG_HOME/jumble/config.toml` if that
+variable is an absolute path; else `~/.config/jumble/config.toml`, on macOS
+too (DEC-10). It is TOML with the setting names of §1 as top-level keys; every
+key is optional. A missing file means built-in defaults; `--no-config` means
+the file is not read at all, so not even a broken one is an error.
+
+Reading the file stops at its first error (DEC-17), checked in this order:
+
+1. The file exists but can't be read (a directory, no permission).
+2. It is not UTF-8, or not valid TOML.
+3. Then each top-level key, in the file's order: is it a setting name of §1;
+   has it the setting's type; does its value pass the setting's own rule.
+
+The types: `length` and `count` are TOML integers (a boolean or a float is the
+wrong type); `charsets` is an array of strings; `custom` is a string; the
+four options are booleans. The rules are §6's, for the one key alone:
+`length` and `count` at least 1, every `charsets` name a known set (an empty
+name is unknown, §2.2), and `custom` with no control or combining character.
+Rules that relate settings to each other (`each`, `no_repeat`, `unique`, an
+empty set, nothing chosen) are not file errors: they are checked on the
+effective settings (§5.2), as for the command line alone. A file error stops
+the command line even when the command line overrides that key; the TUI
+starts without the file instead (§7.4).
+
+The messages are in §6. `PATH` in them is the path as jumble resolved it:
+`$JUMBLE_CONFIG` as given, or the XDG or home path in full, `~` expanded.
 
 ### 5.2 Precedence
 
 Built-in defaults, then the settings file, then the command line, each
 overriding the one before (DEC-9):
 
-- `length`, `count`, and the four booleans are taken key by key. A boolean
+- `length`, `count`, and the four booleans are taken key by key. An option
+  given on the command line overrides the file even at its default value
+  (`-n 16` beats the file's `length = 32`). A boolean
   flag can only turn its option on; `--no-config` is the way to start from the
   built-in defaults.
 - Characters are taken as a whole: if the command line gives `-s` or
-  `--custom`, the file's `charsets` and `custom` are both ignored.
+  `--custom` (even `--custom ''`), the file's `charsets` and `custom` are both
+  ignored. A file that sets either key chooses its characters the same way:
+  `custom = "abc"` alone means only `abc`.
 - If no level chooses any characters, the default `charsets` apply.
 
 ### 5.3 Saving
@@ -257,6 +283,18 @@ the command line before output. The messages, in this order of checking:
 | `unique` gave up (§3.4) | `gave up after D draws with N of COUNT unique strings` |
 
 *P*, *D*, *N*, *COUNT*, *K*, and *A* are written as plain decimal integers.
+
+Settings-file errors (§5.1), checked in that section's order, each naming the
+file as `PATH` and, for a key, the key as `KEY` (DEC-17):
+
+| Condition | Message |
+|---|---|
+| the file can't be read | `can't read PATH: REASON` (`REASON` as for a write, below) |
+| not UTF-8 | `PATH: invalid TOML: not UTF-8` |
+| not valid TOML | `PATH: invalid TOML: DETAIL`, `DETAIL` being `str()` of `tomllib`'s error |
+| unknown key | `PATH: KEY: unknown setting` |
+| wrong type | `PATH: KEY: must be an integer` (`a boolean`, `a string`, `a list of set names`) |
+| a value its rule rejects | `PATH: KEY: MESSAGE`, `MESSAGE` being the table's message above, for example `PATH: length: length must be at least 1` |
 
 The command line prints `jumble: error: MESSAGE` to stderr and exits 2 for any
 of these, for settings-file errors, and for misused options. For the messages
@@ -359,7 +397,9 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
   without change. Main-screen keys don't act while it is open.
 
 When the settings file is invalid, the TUI starts from the built-in defaults
-and shows the error in a toast; saving replaces the invalid values.
+and the command line's options, as if `--no-config` were given, and shows the
+§6 message (without `jumble: error: `) in an error toast; saving replaces the
+invalid values (DEC-17).
 
 ### 7.5 Starting values
 
