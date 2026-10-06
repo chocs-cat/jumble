@@ -22,4 +22,20 @@ stopped mattering is cheaper to skim than to re-derive after it bites again.
 
 ## The catalogue
 
-None yet.
+### §1. An error handler shared by branches speaks for only one
+
+**Shape:** one `try` wraps a call that takes several paths (a file or stdout,
+a cache or the network), and the handler's message is written for one of
+them. The other path raises the same exception type, and the message then
+names the wrong thing, often a `None` or a sentinel like `-`, or it reports an
+expected event (a closed pipe) as a failure.
+
+**Check:** for each `except`, list every path inside the `try` that can raise
+the caught type, and read the message as each would print it. Run the
+sibling path once by hand.
+
+**Provenance:** P0001-C02. `cli.main` caught `OSError` around
+`write_output`, which writes either `-o FILE` or stdout, and printed
+`can't write {args.output}`; `jumble -c 200000 | head -1` printed
+`jumble: error: can't write None: Broken pipe`. Spec §6 had named only the
+file case (`brief-checklist §2`).

@@ -38,13 +38,56 @@ jumble tui                      # pick the length and character sets interactive
 | `-e`, `--each` | at least one character from every chosen set |
 | `-r`, `--no-repeat` | no character twice within a string |
 | `-u`, `--unique` | no string twice in the output |
+| `-o`, `--output FILE` | write to `FILE`, created or overwritten, instead of stdout; `-` means stdout |
+| `--json` | write one JSON object instead of lines (below) |
+| `--strength` | also print the alphabet size and bits per string to stderr |
 
 With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 `digits`. A character that is in more than one chosen set counts once, in the
 first set of the table below, with `--custom` last; a choice left with no
 characters of its own is an error. Each character is one Unicode code point,
 so `--custom` rejects control and combining characters. Errors print
-`jumble: error: …` and exit 2.
+`jumble: error: …` and exit 2; a file `-o` can't write exits 1.
+
+jumble generates every string before writing any, so a failed run prints
+nothing and leaves an existing `-o` file as it was. Output is UTF-8, on stdout
+as in a file, whatever the terminal's locale.
+
+`--json` writes the strings with the alphabet size, the strength in bits
+(an upper bound with `-e`), and the settings the run used:
+
+```console
+$ jumble --json -n 8 -c 2 -s digits,lower
+{
+  "strings": [
+    "k3x9q0ba",
+    "7mz2wd4e"
+  ],
+  "alphabet_size": 36,
+  "strength_bits": 41.4,
+  "strength_is_bound": false,
+  "settings": {
+    "length": 8,
+    "count": 2,
+    "charsets": [
+      "lower",
+      "digits"
+    ],
+    "custom": "",
+    "no_ambiguous": false,
+    "each": false,
+    "no_repeat": false,
+    "unique": false
+  }
+}
+```
+
+Errors are never JSON.
+
+`--strength` prints a line such as `62 characters · 95.3 bits per string` to
+stderr once the output is written (`at most` before the bits with `-e`), so it
+stays out of a pipe or `-o` file. `-o`, `--json`, and `--strength` don't go
+with `tui`.
 
 | Set | Characters | Size |
 |---|---|---|

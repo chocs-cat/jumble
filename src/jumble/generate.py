@@ -8,7 +8,7 @@ import secrets
 import string
 import unicodedata
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import NamedTuple
 
 
@@ -48,8 +48,9 @@ CHARSETS: dict[str, str] = {
     "box": _span(0x2500, 0x259F),
 }
 
-# Look-alike characters left out by `no_ambiguous` (§3.1, DEC-3).
-AMBIGUOUS: frozenset[str] = frozenset("0Ool1I|`'\";:.,-")
+# Look-alike characters left out by `no_ambiguous`, in §3.1's order (DEC-3).
+LOOK_ALIKES = "0Ool1I|`'\";:.,-"
+AMBIGUOUS: frozenset[str] = frozenset(LOOK_ALIKES)
 
 CUSTOM = "custom"
 
@@ -76,6 +77,19 @@ class Settings:
     each: bool = False
     no_repeat: bool = False
     unique: bool = False
+
+
+def settings_dict(settings: Settings) -> dict[str, object]:
+    """`settings` as §1's eight values, keyed by setting name in §1's order (DEC-10).
+
+    `charsets` lists each chosen named set once, in canonical order; `custom`
+    is the string as given (§4.2). Unknown set names are dropped, so pass
+    settings that have passed `validate`.
+    """
+    values = asdict(settings)
+    chosen = set(settings.charsets)
+    values["charsets"] = [name for name in CHARSETS if name in chosen]
+    return values
 
 
 def _custom_chars(custom: str) -> str:
@@ -129,6 +143,18 @@ class Strength(NamedTuple):
     """log₂ of the number of possible strings, unrounded."""
     is_bound: bool
     """True when `each` is on: the bits are then an upper bound (DEC-7)."""
+
+
+def strength_line(strength: Strength) -> str:
+    """The strength line of §4.3, shared by `--strength` and the TUI's subtitle.
+
+    For example `62 characters · 95.3 bits per string`, with `at most` before
+    the bits when they are a bound.
+    """
+    size = strength.alphabet_size
+    chars = "1 character" if size == 1 else f"{size} characters"
+    bound = "at most " if strength.is_bound else ""
+    return f"{chars} · {bound}{strength.bits:.1f} bits per string"
 
 
 def _possible(size: int, settings: Settings) -> int:
