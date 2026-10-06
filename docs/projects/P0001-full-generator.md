@@ -98,6 +98,7 @@ repo.
 | AGENTS.md, *Conventions* | Module ownership: `generate.py` and new `config.py` | An implementation boundary every chunk shares. |
 | AGENTS.md, *Testing notes* | TUI focus starts on the results pane; tests isolate the settings file with `$JUMBLE_CONFIG` | Every TUI and config test depends on these. |
 | `docs/decisions.md`, DEC-2 – DEC-13 | The choices behind the spec | Where the docs left a real choice. |
+| `docs/spec.md` §2.2, §6 (at the cut of P0001-C01) | An empty `-s` name is an error and `custom` is not a set name; §6 numbers are plain integers; the CLI's validation error is one line with no usage | Questions the C01 executor would otherwise have decided. |
 
 README.md is not changed by this planning work: it stays true to the shipped
 behavior, and each chunk updates it with the behavior it lands.
@@ -215,7 +216,7 @@ while the screen is open.
 
 | Chunk | Delivery items | State | Review | Integrated identity |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| P0001-C01 | D1 | ready for an executor | — | — |
 
 ## 8. Closeout
 
