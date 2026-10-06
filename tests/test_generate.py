@@ -2,12 +2,13 @@
 
 import re
 import secrets
+from dataclasses import fields
 from pathlib import Path
 
 import pytest
 
 from jumble import JumbleError, Settings, generate
-from jumble.generate import CHARSETS, validate
+from jumble.generate import CHARSETS, settings_dict, validate
 
 
 def alphabet(settings: Settings) -> set[str]:
@@ -134,3 +135,10 @@ def test_no_random_module_in_src() -> None:
     assert files
     for path in files:
         assert not pattern.search(path.read_text(encoding="utf-8")), path
+
+
+def test_settings_dict() -> None:
+    d = settings_dict(Settings(charsets=("box", "lower", "box"), custom="zz", each=True))
+    assert list(d) == [f.name for f in fields(Settings)]
+    assert d["charsets"] == ["lower", "box"]
+    assert (d["custom"], d["each"], d["length"]) == ("zz", True, 16)

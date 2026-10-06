@@ -1,6 +1,8 @@
 import io
+import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -165,3 +167,94 @@ def test_unwritable_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     code, lines, err = run(["-o", str(out)], capsys)
     assert (code, lines) == (1, [])
     assert err == f"jumble: error: can't write {out}: No such file or directory\n"
+
+
+JSON_KEYS = ["strings", "alphabet_size", "strength_bits", "strength_is_bound", "settings"]
+
+
+def run_json(argv: list[str], capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
+    code = main(["--json", *argv])
+    out, err = capsys.readouterr()
+    assert (code, err) == (0, "")
+    return json.loads(out)
+
+
+def test_json_defaults(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--json"]) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    obj = json.loads(out)
+    assert list(obj) == JSON_KEYS
+    assert out == json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
+    assert len(obj["strings"]) == 1
+    assert len(obj["strings"][0]) == 16
+    assert (obj["alphabet_size"], obj["strength_bits"], obj["strength_is_bound"]) == (
+        62,
+        95.3,
+        False,
+    )
+    # §1's defaults, in §1's order.
+    assert list(obj["settings"].items()) == [
+        ("length", 16),
+        ("count", 1),
+        ("charsets", ["lower", "upper", "digits"]),
+        ("custom", ""),
+        ("no_ambiguous", False),
+        ("each", False),
+        ("no_repeat", False),
+        ("unique", False),
+    ]
+
+
+def test_json_charsets_once_in_canonical_order(capsys: pytest.CaptureFixture[str]) -> None:
+    obj = run_json(["-s", "digits,lower,lower"], capsys)
+    assert obj["settings"]["charsets"] == ["lower", "digits"]
+    assert obj["alphabet_size"] == 36
+
+
+def test_json_custom_alone(capsys: pytest.CaptureFixture[str]) -> None:
+    obj = run_json(["--custom", "aab"], capsys)
+    assert (obj["settings"]["charsets"], obj["settings"]["custom"]) == ([], "aab")
+    assert obj["alphabet_size"] == 2
+
+
+def test_json_settings_follow_the_options(capsys: pytest.CaptureFixture[str]) -> None:
+    obj = run_json(["-n", "6", "-c", "3", "-s", "lower,digits", "-a", "-e", "-r", "-u"], capsys)
+    assert obj["settings"] == {
+        "length": 6,
+        "count": 3,
+        "charsets": ["lower", "digits"],
+        "custom": "",
+        "no_ambiguous": True,
+        "each": True,
+        "no_repeat": True,
+        "unique": True,
+    }
+    assert obj["strength_is_bound"] is True
+    assert len(set(obj["strings"])) == 3
+
+
+def test_json_strength_is_rounded(capsys: pytest.CaptureFixture[str]) -> None:
+    # log₂(10⁷) = 23.25…
+    obj = run_json(["-s", "digits", "-n", "7"], capsys)
+    assert obj["strength_bits"] == 23.3
+
+
+def test_json_does_not_escape_emoji(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--json", "-s", "emoji-food", "-n", "3"]) == 0
+    out = capsys.readouterr().out
+    string = json.loads(out)["strings"][0]
+    assert f'"{string}"' in out
+    assert "\\u" not in out
+
+
+def test_json_to_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    out = tmp_path / "out.json"
+    code, lines, err = run(["--json", "-o", str(out)], capsys)
+    assert (code, lines, err) == (0, [], "")
+    assert list(json.loads(out.read_bytes().decode("utf-8"))) == JSON_KEYS
+
+
+def test_json_errors_are_plain(capsys: pytest.CaptureFixture[str]) -> None:
+    code, lines, err = run(["--json", "-n", "0"], capsys)
+    assert (code, lines, err) == (2, [], "jumble: error: length must be at least 1\n")

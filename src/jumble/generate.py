@@ -8,7 +8,7 @@ import secrets
 import string
 import unicodedata
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import NamedTuple
 
 
@@ -77,6 +77,19 @@ class Settings:
     each: bool = False
     no_repeat: bool = False
     unique: bool = False
+
+
+def settings_dict(settings: Settings) -> dict[str, object]:
+    """`settings` as §1's eight values, keyed by setting name in §1's order (DEC-10).
+
+    `charsets` lists each chosen named set once, in canonical order; `custom`
+    is the string as given (§4.2). Unknown set names are dropped, so pass
+    settings that have passed `validate`.
+    """
+    values = asdict(settings)
+    chosen = set(settings.charsets)
+    values["charsets"] = [name for name in CHARSETS if name in chosen]
+    return values
 
 
 def _custom_chars(custom: str) -> str:

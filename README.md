@@ -39,6 +39,7 @@ jumble tui                      # pick the length and character sets interactive
 | `-r`, `--no-repeat` | no character twice within a string |
 | `-u`, `--unique` | no string twice in the output |
 | `-o`, `--output FILE` | write to `FILE`, created or overwritten, instead of stdout; `-` means stdout |
+| `--json` | write one JSON object instead of lines (below) |
 
 With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 `digits`. A character that is in more than one chosen set counts once, in the
@@ -50,6 +51,37 @@ so `--custom` rejects control and combining characters. Errors print
 jumble generates every string before writing any, so a failed run prints
 nothing and leaves an existing `-o` file as it was. Output is UTF-8, on stdout
 as in a file, whatever the terminal's locale.
+
+`--json` writes the strings with the alphabet size, the strength in bits
+(an upper bound with `-e`), and the settings the run used:
+
+```console
+$ jumble --json -n 8 -c 2 -s digits,lower
+{
+  "strings": [
+    "k3x9q0ba",
+    "7mz2wd4e"
+  ],
+  "alphabet_size": 36,
+  "strength_bits": 41.4,
+  "strength_is_bound": false,
+  "settings": {
+    "length": 8,
+    "count": 2,
+    "charsets": [
+      "lower",
+      "digits"
+    ],
+    "custom": "",
+    "no_ambiguous": false,
+    "each": false,
+    "no_repeat": false,
+    "unique": false
+  }
+}
+```
+
+Errors are never JSON.
 
 | Set | Characters | Size |
 |---|---|---|
