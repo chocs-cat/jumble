@@ -48,8 +48,9 @@ CHARSETS: dict[str, str] = {
     "box": _span(0x2500, 0x259F),
 }
 
-# Look-alike characters left out by `no_ambiguous` (§3.1, DEC-3).
-AMBIGUOUS: frozenset[str] = frozenset("0Ool1I|`'\";:.,-")
+# Look-alike characters left out by `no_ambiguous`, in §3.1's order (DEC-3).
+LOOK_ALIKES = "0Ool1I|`'\";:.,-"
+AMBIGUOUS: frozenset[str] = frozenset(LOOK_ALIKES)
 
 CUSTOM = "custom"
 

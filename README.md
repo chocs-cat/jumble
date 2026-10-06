@@ -38,13 +38,18 @@ jumble tui                      # pick the length and character sets interactive
 | `-e`, `--each` | at least one character from every chosen set |
 | `-r`, `--no-repeat` | no character twice within a string |
 | `-u`, `--unique` | no string twice in the output |
+| `-o`, `--output FILE` | write to `FILE`, created or overwritten, instead of stdout; `-` means stdout |
 
 With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 `digits`. A character that is in more than one chosen set counts once, in the
 first set of the table below, with `--custom` last; a choice left with no
 characters of its own is an error. Each character is one Unicode code point,
 so `--custom` rejects control and combining characters. Errors print
-`jumble: error: …` and exit 2.
+`jumble: error: …` and exit 2; a file `-o` can't write exits 1.
+
+jumble generates every string before writing any, so a failed run prints
+nothing and leaves an existing `-o` file as it was. Output is UTF-8, on stdout
+as in a file, whatever the terminal's locale.
 
 | Set | Characters | Size |
 |---|---|---|
