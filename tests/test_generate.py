@@ -1,154 +1,136 @@
-import string
-import unicodedata
+"""Generation (§3.2 to §3.4) and the rule that randomness comes from `secrets`."""
+
+import re
+import secrets
+from pathlib import Path
 
 import pytest
 
-from jumble import generate
-from jumble.generate import AMBIGUOUS, CHARSETS, JumbleError, Settings, alphabet, chosen_sets
+from jumble import JumbleError, Settings, generate
+from jumble.generate import CHARSETS, validate
 
 
-def test_length_and_charset() -> None:
-    s = generate(40, ["digits"])
-    assert len(s) == 40
-    assert set(s) <= set(string.digits)
-
-
-def test_exclude_ambiguous() -> None:
-    assert not set(alphabet(["lower", "upper", "digits"], exclude_ambiguous=True)) & AMBIGUOUS
+def alphabet(settings: Settings) -> set[str]:
+    return {c for _, chars in validate(settings) for c in chars}
 
 
 @pytest.mark.parametrize(
-    ("length", "charsets"),
-    [(0, ["lower"]), (8, []), (8, ["emoji"])],
+    "settings",
+    [
+        Settings(),
+        Settings(length=40, count=5, charsets=("digits",)),
+        Settings(length=7, count=3, charsets=("emoji-faces", "box"), custom="xyz"),
+        Settings(length=30, count=4, charsets=("lower", "symbols"), no_ambiguous=True),
+    ],
 )
-def test_rejects_bad_input(length: int, charsets: list[str]) -> None:
-    with pytest.raises(ValueError):
-        generate(length, charsets)
+def test_length_count_and_alphabet(settings: Settings) -> None:
+    strings = generate(settings)
+    assert len(strings) == settings.count
+    allowed = alphabet(settings)
+    for s in strings:
+        assert len(s) == settings.length
+        assert set(s) <= allowed
 
 
-# --- §2.1 named sets, §2.3 custom characters, §2.4 the alphabet ---
+@pytest.mark.parametrize("length", [10, 62])
+def test_no_repeat(length: int) -> None:
+    for s in generate(Settings(length=length, count=20, no_repeat=True)):
+        assert len(set(s)) == len(s) == length
 
 
-def cps(*ranges: tuple[int, int], without: tuple[int, ...] = ()) -> str:
-    """The code points of the inclusive `ranges`, less `without`, in order."""
-    return "".join(chr(c) for lo, hi in ranges for c in range(lo, hi + 1) if c not in without)
+def test_no_repeat_at_length_a_is_a_permutation() -> None:
+    for s in generate(Settings(length=10, count=10, charsets=("digits",), no_repeat=True)):
+        assert sorted(s) == list("0123456789")
 
 
-# Name, expected characters, and size, transcribed from spec §2.1 in its order.
-SPEC_SETS: list[tuple[str, str, int]] = [
-    ("lower", cps((0x61, 0x7A)), 26),
-    ("upper", cps((0x41, 0x5A)), 26),
-    ("digits", cps((0x30, 0x39)), 10),
-    ("symbols", "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", 32),
-    ("space", " ", 1),
-    ("chess", cps((0x2654, 0x265F)), 12),
-    (
-        "cards",
-        cps(
-            (0x1F0A1, 0x1F0AE),
-            (0x1F0B1, 0x1F0BE),
-            (0x1F0C1, 0x1F0CE),
-            (0x1F0D1, 0x1F0DE),
-            without=(0x1F0AC, 0x1F0BC, 0x1F0CC, 0x1F0DC),
-        ),
-        52,
+EACH_CASES = [
+    Settings(length=12, count=50, charsets=("lower", "digits", "dice"), custom="#", each=True),
+    # length = k: every string is exactly one character from each set
+    Settings(length=4, count=50, charsets=("lower", "digits", "dice"), custom="#", each=True),
+    Settings(
+        length=8, count=50, charsets=("upper", "chess"), custom="xy", each=True, no_repeat=True
     ),
-    ("dice", cps((0x2680, 0x2685)), 6),
-    ("emoji-faces", cps((0x1F600, 0x1F64F)), 80),
-    ("emoji-animals", cps((0x1F400, 0x1F43E)), 63),
-    ("emoji-food", cps((0x1F345, 0x1F37B)), 55),
-    ("greek", cps((0x0391, 0x03A9), (0x03B1, 0x03C9), without=(0x03A2, 0x03C2)), 48),
-    ("cyrillic", cps((0x0410, 0x044F)), 64),
-    ("latin-accented", cps((0x00C0, 0x00FF), without=(0x00D7, 0x00F7)), 62),
-    ("arrows", cps((0x2190, 0x2199)), 10),
-    ("math", "±×÷∞≠≈≤≥√∑∏∫∂∆∇∈∉∩∪⊂⊃∀∃¬∧∨", 26),
-    ("currency", "¢£¥€₹₽₩₪₺₿₫₱", 12),
-    ("box", cps((0x2500, 0x259F)), 160),
+    Settings(
+        length=3, count=50, charsets=("upper", "chess"), custom="xy", each=True, no_repeat=True
+    ),
 ]
 
 
-def test_charsets_are_the_spec_sets_in_canonical_order() -> None:
-    assert list(CHARSETS) == [name for name, _, _ in SPEC_SETS]
+@pytest.mark.parametrize("settings", EACH_CASES)
+def test_each_takes_one_from_every_set(settings: Settings) -> None:
+    sets = validate(settings)
+    for s in generate(settings):
+        assert len(s) == settings.length
+        for name, chars in sets:
+            assert set(s) & set(chars), f"{s!r} has nothing from {name}"
+        if settings.no_repeat:
+            assert len(set(s)) == len(s)
 
 
-@pytest.mark.parametrize(("name", "expected", "size"), SPEC_SETS)
-def test_named_set_matches_spec(name: str, expected: str, size: int) -> None:
-    assert CHARSETS[name] == expected
-    assert len(CHARSETS[name]) == size
-    for c in CHARSETS[name]:
-        assert unicodedata.category(c)[0] not in "CM", f"{name}: U+{ord(c):04X}"
-
-
-def test_named_sets_are_disjoint() -> None:
-    seen: set[str] = set()
-    for chars in CHARSETS.values():
-        assert not seen & set(chars)
-        seen.update(chars)
-
-
-def test_ambiguous_is_the_spec_list() -> None:
-    assert (
-        set(["0", "O", "o", "l", "1", "I", "|", "`", "'", '"', ";", ":", ".", ",", "-"])
-        == AMBIGUOUS
+def test_each_with_no_repeat_at_length_a() -> None:
+    settings = Settings(
+        length=13, count=10, charsets=("digits",), custom="abc", each=True, no_repeat=True
     )
-    assert len(AMBIGUOUS) == 15
+    for s in generate(settings):
+        assert sorted(s) == sorted("0123456789abc")
 
 
-def test_settings_defaults_are_spec_1() -> None:
-    s = Settings()
-    assert (s.length, s.count, s.charsets, s.custom) == (16, 1, ("lower", "upper", "digits"), "")
-    assert not (s.no_ambiguous or s.each or s.no_repeat or s.unique)
-    assert [f for f in Settings.__dataclass_fields__] == [
-        "length",
-        "count",
-        "charsets",
-        "custom",
-        "no_ambiguous",
-        "each",
-        "no_repeat",
-        "unique",
-    ]
-
-
-def test_jumble_error_is_a_value_error() -> None:
-    assert issubclass(JumbleError, ValueError)
-
-
-def test_sets_come_in_canonical_order_with_custom_last() -> None:
-    sets = chosen_sets(Settings(charsets=("digits", "chess", "lower", "digits"), custom="!x"))
-    assert [name for name, _ in sets] == ["lower", "digits", "chess", "custom"]
-
-
-def test_custom_dedupe_keeps_first_position() -> None:
-    assert chosen_sets(Settings(charsets=(), custom="!x!yx"))[-1] == ("custom", "!xy")
-
-
-def test_overlaps_stay_in_the_earlier_set() -> None:
-    sets = dict(chosen_sets(Settings(charsets=("lower",), custom="abcX")))
-    assert sets["lower"] == CHARSETS["lower"]
-    assert sets["custom"] == "X"
-
-
-def test_no_ambiguous_applies_to_every_set_including_custom() -> None:
-    sets = dict(
-        chosen_sets(
-            Settings(charsets=("lower", "digits", "symbols"), custom="O!Z", no_ambiguous=True)
+def test_each_shuffles() -> None:
+    # Without the shuffle the first character would always be from `lower`.
+    first = {
+        s[0]
+        for s in generate(
+            Settings(length=3, count=200, charsets=("lower", "digits"), custom="#", each=True)
         )
-    )
-    assert sets["lower"] == CHARSETS["lower"].replace("l", "").replace("o", "")
-    assert sets["digits"] == "23456789"
-    assert not set(sets["symbols"]) & AMBIGUOUS
-    assert sets["custom"] == "Z"  # O is a look-alike; ! is already in symbols
+    }
+    assert first & set("0123456789#")
 
 
-@pytest.mark.parametrize(
-    "char", ["\x07", "\u200b", "\u0301", "\ue000", "\ud800", "\U0010fffe", "\U000e0001"]
-)
-def test_custom_rejects_control_and_combining(char: str) -> None:
+def test_unique_has_no_duplicates() -> None:
+    strings = generate(Settings(length=2, count=100, charsets=("digits",), unique=True))
+    assert sorted(strings) == [f"{n:02}" for n in range(100)]
+
+
+def test_impossible_unique_fails_before_any_draw(monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_draw(n: int) -> int:
+        raise AssertionError("drew before validating")
+
+    monkeypatch.setattr(secrets, "randbelow", no_draw)
     with pytest.raises(JumbleError) as e:
-        chosen_sets(Settings(custom="ab" + char))
-    assert str(e.value) == "custom characters can't include control or combining characters"
+        generate(Settings(length=1, count=11, charsets=("digits",), unique=True))
+    assert str(e.value) == "only 10 different strings are possible"
 
 
-def test_empty_custom_is_not_a_set() -> None:
-    assert [name for name, _ in chosen_sets(Settings())] == ["lower", "upper", "digits"]
+def test_unique_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(secrets, "randbelow", lambda n: 0)
+    with pytest.raises(JumbleError) as e:
+        generate(Settings(count=2, unique=True))
+    assert str(e.value) == "gave up after 100000 draws with 1 of 2 unique strings"
+
+
+def test_unique_cap_grows_with_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(secrets, "randbelow", lambda n: 0)
+    with pytest.raises(JumbleError) as e:
+        generate(Settings(length=2, count=6000, charsets=tuple(CHARSETS), unique=True))
+    assert str(e.value) == "gave up after 120000 draws with 1 of 6000 unique strings"
+
+
+def test_draws_use_randbelow(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[int] = []
+
+    def randbelow(n: int) -> int:
+        calls.append(n)
+        return 0
+
+    monkeypatch.setattr(secrets, "randbelow", randbelow)
+    assert generate(Settings(length=5, charsets=("digits",))) == ["00000"]
+    assert calls == [10] * 5
+
+
+def test_no_random_module_in_src() -> None:
+    src = Path(__file__).parent.parent / "src"
+    pattern = re.compile(r"^\s*(import\s+random\b|from\s+random\b)|SystemRandom", re.MULTILINE)
+    files = sorted(src.rglob("*.py"))
+    assert files
+    for path in files:
+        assert not pattern.search(path.read_text(encoding="utf-8")), path

@@ -3,7 +3,7 @@
 import argparse
 from collections.abc import Sequence
 
-from jumble.generate import CHARSETS, generate
+from jumble.generate import CHARSETS, Settings, generate
 
 DEFAULT_CHARSETS = ["lower", "upper", "digits"]
 
@@ -38,15 +38,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         JumbleApp().run()
         return 0
+    settings = Settings(
+        length=args.length,
+        count=args.count,
+        charsets=tuple(args.charset or DEFAULT_CHARSETS),
+        no_ambiguous=args.no_ambiguous,
+    )
     try:
-        for _ in range(args.count):
-            print(
-                generate(
-                    args.length,
-                    args.charset or DEFAULT_CHARSETS,
-                    exclude_ambiguous=args.no_ambiguous,
-                )
-            )
+        for line in generate(settings):
+            print(line)
     except ValueError as e:
         parser().error(str(e))
     return 0

@@ -174,28 +174,60 @@ def strength(settings: Settings) -> Strength:
     return Strength(size, bits, settings.each)
 
 
-def alphabet(charsets: Iterable[str], *, exclude_ambiguous: bool = False) -> str:
-    """Join the named character sets into one alphabet, without duplicates."""
-    chars: dict[str, None] = {}
-    for name in charsets:
-        if name not in CHARSETS:
-            raise ValueError(f"unknown character set: {name!r}")
-        chars.update(dict.fromkeys(CHARSETS[name]))
-    if exclude_ambiguous:
-        chars = {c: None for c in chars if c not in AMBIGUOUS}
-    if not chars:
-        raise ValueError("no characters to choose from")
-    return "".join(chars)
+def _sample(pool: list[str], n: int) -> list[str]:
+    """`n` distinct items of `pool`, by a partial Fisher–Yates shuffle (DEC-6). Reorders `pool`."""
+    for i in range(n):
+        j = i + secrets.randbelow(len(pool) - i)
+        pool[i], pool[j] = pool[j], pool[i]
+    return pool[:n]
 
 
-def generate(
-    length: int = 16,
-    charsets: Iterable[str] = ("lower", "upper", "digits"),
-    *,
-    exclude_ambiguous: bool = False,
-) -> str:
-    """Return a random string of `length` characters, using `secrets` (DEC-1)."""
-    if length < 1:
-        raise ValueError("length must be at least 1")
-    chars = alphabet(charsets, exclude_ambiguous=exclude_ambiguous)
-    return "".join(secrets.choice(chars) for _ in range(length))
+def _shuffle(items: list[str]) -> None:
+    """Shuffle `items` in place with Fisher–Yates (DEC-6)."""
+    for i in range(len(items) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        items[i], items[j] = items[j], items[i]
+
+
+def _draw(settings: Settings, sets: list[tuple[str, str]], alphabet: str) -> str:
+    """One string of `settings.length` characters (§3.2, §3.3)."""
+    length = settings.length
+    if settings.each:
+        chars = [s[secrets.randbelow(len(s))] for _, s in sets]
+        rest = length - len(chars)
+        if settings.no_repeat:
+            # The sets are disjoint, so the picks are distinct already.
+            picked = set(chars)
+            chars += _sample([c for c in alphabet if c not in picked], rest)
+        else:
+            chars += [alphabet[secrets.randbelow(len(alphabet))] for _ in range(rest)]
+        _shuffle(chars)
+        return "".join(chars)
+    if settings.no_repeat:
+        return "".join(_sample(list(alphabet), length))
+    return "".join(alphabet[secrets.randbelow(len(alphabet))] for _ in range(length))
+
+
+def generate(settings: Settings) -> list[str]:
+    """Validate `settings`, then draw `count` strings (§3).
+
+    Every draw goes through `secrets.randbelow` (DEC-1, DEC-6). With `unique`,
+    a repeat is drawn again, and after `max(100000, 20 × count)` draws without
+    `count` distinct strings generation gives up (§3.4, DEC-7).
+    """
+    sets = validate(settings)
+    alphabet = "".join(chars for _, chars in sets)
+    if not settings.unique:
+        return [_draw(settings, sets, alphabet) for _ in range(settings.count)]
+
+    cap = max(100_000, 20 * settings.count)
+    strings: dict[str, None] = {}  # keeps drawn order
+    draws = 0
+    while len(strings) < settings.count:
+        if draws == cap:
+            raise JumbleError(
+                f"gave up after {cap} draws with {len(strings)} of {settings.count} unique strings"
+            )
+        strings[_draw(settings, sets, alphabet)] = None
+        draws += 1
+    return list(strings)

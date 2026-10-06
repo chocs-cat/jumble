@@ -39,4 +39,4 @@ testpaths = ["tests"]
 [tool.ruff.lint.per-file-ignores]
 # The character sets are full of look-alikes on purpose (docs/spec.md §2.1).
 "src/jumble/generate.py" = ["RUF001", "RUF002", "RUF003"]
-"tests/test_generate.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_sets.py" = ["RUF001", "RUF002", "RUF003"]
