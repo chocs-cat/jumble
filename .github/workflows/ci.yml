@@ -17,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Reads the Python version from .python-version.
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv publishes no moving major tag; Dependabot keeps this current.
+      - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --locked
       - run: make check
