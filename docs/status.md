@@ -15,9 +15,9 @@ Last review: none yet.
 ## In flight
 
 - **Chunk:** P0001-C01
-- **State:** executing
+- **State:** awaiting review
 - **Branch:** `chunk/p0001-c01`
-- **Pull request:** `#7` (draft)
+- **Pull request:** `#7` (ready)
 - **Units committed:** a, b, c, d
 
 (Fixed shape. `State` ∈ `ready for an executor` · `executing` ·
