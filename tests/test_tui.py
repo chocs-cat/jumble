@@ -420,6 +420,33 @@ async def test_an_invalid_start_shows_the_banner_and_no_strings(
         assert results(app) == []
 
 
+async def test_a_file_error_is_a_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    message = "X: length: length must be at least 1"
+    app = JumbleApp(Settings(), file_error=message)
+    record = Recorder(app, monkeypatch)  # before mount, which shows the toast
+    async with app.run_test():
+        assert (record.toasts, record.severities) == ([message], ["error"])
+        assert banner(app) is None
+        assert len(results(app)) == 1
+
+
+async def test_no_file_error_no_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp(Settings())
+    record = Recorder(app, monkeypatch)
+    async with app.run_test():
+        assert record.toasts == []
+
+
+async def test_a_files_each_with_a_short_length_starts_with_the_banner() -> None:
+    # `each` from a file and too short a length: the banner, not an error (DEC-16).
+    app = JumbleApp(Settings(length=2, each=True))
+    async with app.run_test():
+        assert banner(app) == (
+            "length must be at least 3 to take one character from each of 3 sets"
+        )
+        assert results(app) == []
+
+
 NAME = "jumble-1760000000-1500.txt"
 
 

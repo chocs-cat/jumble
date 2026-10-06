@@ -63,11 +63,13 @@ class JumbleApp(App[None]):
         Binding("escape", "focus_results", show=False),
     ]
 
-    def __init__(self, settings: Settings = DEFAULTS) -> None:
+    def __init__(self, settings: Settings = DEFAULTS, file_error: str | None = None) -> None:
         """`settings` are the controls' starting values, as given: the caller fills
-        the default sets (§5.2, §7.5, DEC-9)."""
+        the default sets (§5.2, §7.5, DEC-9). `file_error` is a settings-file
+        message to show in an error toast at start (§7.4, DEC-17)."""
         super().__init__()
         self.initial = settings
+        self.file_error = file_error
         self.title = f"jumble {version('jumble')}"
         self.strings: list[str] = []
         self.valid = False
@@ -101,6 +103,8 @@ class JumbleApp(App[None]):
         # An invalid start shows the banner and jumbles nothing (§7.2, §7.5).
         self.check()
         self.action_jumble()
+        if self.file_error:
+            self.notify(self.file_error, severity="error")
 
     def settings(self) -> Settings:
         """The controls as one `Settings`, unvalidated and with no default fill (§7.1)."""

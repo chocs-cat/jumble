@@ -153,9 +153,11 @@ characters from three sets.
 
 ### The TUI
 
-`jumble tui` opens the generator in the terminal. Options given before `tui`
-set its starting values: `jumble -n 32 -s digits tui` opens on 32-digit
-strings. An unknown set name is an error before the TUI opens; any other value
+`jumble tui` opens the generator in the terminal. It starts from the settings
+file, like the command line, and options given before `tui` override it:
+`jumble -n 32 -s digits tui` opens on 32-digit strings. A broken settings file
+doesn't stop the TUI: it opens from the built-in defaults and those options,
+with the error in a toast. An unknown set name is an error before the TUI opens; any other value
 it can't use (`-n 0`) opens it with the banner showing, to fix there.
 
 On the left are the controls: length and count, every character set in the

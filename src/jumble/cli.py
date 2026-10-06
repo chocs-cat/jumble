@@ -150,7 +150,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         for option, given in misused:
             if given:
                 p.error(f"{option} can't be used with tui")
-        settings = settings_from(args, {})
+        file_error = None
+        try:
+            file = {} if args.no_config else load(config_path())
+        except JumbleError as e:
+            # The TUI starts as if --no-config were given and toasts the
+            # message, so the file can be repaired from there (§7.4, DEC-17).
+            file, file_error = {}, str(e)
+        settings = settings_from(args, file)
         try:
             # Only a name no checkbox can hold stops the TUI; any other bad
             # value starts it with the banner shown (§7.5, DEC-16).
@@ -160,7 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         from jumble.tui import JumbleApp
 
-        JumbleApp(settings).run()
+        JumbleApp(settings, file_error=file_error).run()
         return 0
     # Generate everything before opening any output, so a failed run writes
     # nothing and leaves an existing -o file as it was (§4.1, DEC-8).

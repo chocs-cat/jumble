@@ -553,3 +553,41 @@ def test_help_names_no_config(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit):
         main(["--help"])
     assert "--no-config" in capsys.readouterr().out
+
+
+# The TUI starts from the settings file too (§7.4, §7.5).
+
+
+@pytest.mark.parametrize(
+    ("argv", "length"),
+    [(["tui"], 32), (["-n", "8", "tui"], 8), (["--no-config", "tui"], 16)],
+)
+def test_tui_starts_from_the_file(
+    argv: list[str], length: int, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file.write_text("length = 32\n")
+    launched = Launched(monkeypatch)
+    assert main(argv) == 0
+    assert [(app.initial.length, app.file_error) for app in launched.apps] == [(length, None)]
+
+
+def test_a_file_error_starts_the_tui_without_the_file(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("count = 5\nlength = 0\n")
+    launched = Launched(monkeypatch)
+    assert main(["-n", "8", "tui"]) == 0
+    assert capsys.readouterr() == ("", "")
+    [app] = launched.apps
+    assert app.initial == Settings(length=8)
+    assert app.file_error == f"{config_file}: length: length must be at least 1"
+
+
+def test_an_unknown_set_still_stops_the_tui_with_a_broken_file(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 0\n")
+    launched = Launched(monkeypatch)
+    code, _, err = run(["-s", "foo", "tui"], capsys)
+    assert (code, err) == (2, "jumble: error: unknown character set: 'foo'\n")
+    assert launched.apps == []
