@@ -4,8 +4,11 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from typing import Any
 
+from jumble.config import config_path, load
 from jumble.generate import (
     CHARSETS,
     LOOK_ALIKES,
@@ -21,14 +24,18 @@ from jumble.generate import (
 
 DEFAULTS = Settings()
 
+# The settings a command-line flag can only turn on (§5.2, DEC-9).
+BOOLEANS = ("no_ambiguous", "each", "no_repeat", "unique")
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jumble", description="Generate random strings.")
+    # -n, -c, and --custom default to None, so an option given at its default
+    # value still overrides the settings file (§5.2).
     p.add_argument(
         "-n",
         "--length",
         type=int,
-        default=DEFAULTS.length,
         metavar="N",
         help=f"characters per string (default {DEFAULTS.length})",
     )
@@ -36,7 +43,6 @@ def parser() -> argparse.ArgumentParser:
         "-c",
         "--count",
         type=int,
-        default=DEFAULTS.count,
         metavar="N",
         help=f"how many strings (default {DEFAULTS.count})",
     )
@@ -49,11 +55,11 @@ def parser() -> argparse.ArgumentParser:
         metavar="NAME[,NAME...]",
         help="character sets to draw from; repeat or separate with commas. "
         f"Sets: {', '.join(CHARSETS)} "
-        f"(default: {', '.join(DEFAULTS.charsets)}, when no --custom is given)",
+        f"(default: {', '.join(DEFAULTS.charsets)}, when neither --custom nor the "
+        "settings file chooses characters)",
     )
     p.add_argument(
         "--custom",
-        default="",
         metavar="CHARS",
         help="also draw from these characters, as one more set",
     )
@@ -87,6 +93,11 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also print the alphabet size and bits per string to stderr",
     )
+    p.add_argument(
+        "--no-config",
+        action="store_true",
+        help=f"ignore the settings file ({config_path()})",
+    )
     sub = p.add_subparsers(dest="command")
     sub.add_parser(
         "tui",
@@ -98,22 +109,32 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
-def settings_from(args: argparse.Namespace) -> Settings:
-    """One `Settings` from parsed arguments (§1, §2.2)."""
-    charsets = tuple(name for value in args.charset for name in value.split(","))
-    if not charsets and not args.custom:
+def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings:
+    """One `Settings` from parsed arguments over the settings file's keys (§5.2, DEC-9).
+
+    Built-in defaults, then `file` (what `config.load` returned, or `{}`), then
+    the command line. `length`, `count`, and the booleans go key by key; an
+    option counts when it is given, even at its default value, and a flag
+    only turns its option on. The characters go as a whole: `-s` or
+    `--custom` (even `--custom ''`) replaces both of the file's `charsets` and
+    `custom`. The default sets apply only when no level chose any.
+    """
+    values = {key: file[key] for key in ("length", "count", *BOOLEANS) if key in file}
+    for key in ("length", "count"):
+        if getattr(args, key) is not None:
+            values[key] = getattr(args, key)
+    for key in BOOLEANS:
+        if getattr(args, key):
+            values[key] = True
+    names = tuple(name for value in args.charset for name in value.split(","))
+    if names or args.custom is not None:
+        charsets, custom = names, args.custom or ""
+    else:
+        charsets, custom = tuple(file.get("charsets", ())), file.get("custom", "")
+    if not charsets and not custom:
         # Nothing chose any characters, so the default sets apply (§1, DEC-9).
         charsets = DEFAULTS.charsets
-    return Settings(
-        length=args.length,
-        count=args.count,
-        charsets=charsets,
-        custom=args.custom,
-        no_ambiguous=args.no_ambiguous,
-        each=args.each,
-        no_repeat=args.no_repeat,
-        unique=args.unique,
-    )
+    return replace(DEFAULTS, **values, charsets=charsets, custom=custom)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -129,7 +150,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for option, given in misused:
             if given:
                 p.error(f"{option} can't be used with tui")
-        settings = settings_from(args)
+        settings = settings_from(args, {})
         try:
             # Only a name no checkbox can hold stops the TUI; any other bad
             # value starts it with the banner shown (§7.5, DEC-16).
@@ -143,8 +164,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     # Generate everything before opening any output, so a failed run writes
     # nothing and leaves an existing -o file as it was (§4.1, DEC-8).
-    settings = settings_from(args)
     try:
+        # A broken file stops the run even where the command line overrides
+        # the bad key (§5.1, DEC-17); --no-config doesn't read it at all.
+        file = {} if args.no_config else load(config_path())
+        settings = settings_from(args, file)
         strings = generate(settings)
     except JumbleError as e:
         # The message is the whole output, with no usage line (§6).

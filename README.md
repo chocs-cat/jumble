@@ -42,9 +42,10 @@ jumble -n 32 -s digits tui      # the same, starting from 32 digits
 | `-o`, `--output FILE` | write to `FILE`, created or overwritten, instead of stdout; `-` means stdout |
 | `--json` | write one JSON object instead of lines (below) |
 | `--strength` | also print the alphabet size and bits per string to stderr |
+| `--no-config` | ignore the settings file (below) |
 
-With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
-`digits`. A character that is in more than one chosen set counts once, in the
+With no `-s` and no `--custom`, and no characters chosen in the settings
+file, jumble draws from `lower`, `upper`, and `digits`. A character that is in more than one chosen set counts once, in the
 first set of the table below, with `--custom` last; a choice left with no
 characters of its own is an error. Each character is one Unicode code point,
 so `--custom` rejects control and combining characters. Errors print
@@ -112,6 +113,43 @@ with `tui`.
 | `math` | `±×÷∞≠≈≤≥√∑∏∫∂∆∇∈∉∩∪⊂⊃∀∃¬∧∨` | 26 |
 | `currency` | `¢£¥€₹₽₩₪₺₿₫₱` | 12 |
 | `box` | box drawing and block elements ─…▟ | 160 |
+
+### Settings file
+
+jumble starts from a TOML settings file, if there is one, at the first of:
+
+- `$JUMBLE_CONFIG`, if set and not empty (a relative path is relative to the
+  working directory);
+- `$XDG_CONFIG_HOME/jumble/config.toml`, if that variable is an absolute path;
+- `~/.config/jumble/config.toml`, on macOS too.
+
+Its keys are the setting names `--json` shows, and every key is optional:
+
+```toml
+length = 24
+count = 5
+charsets = ["lower", "digits"]
+custom = "!?"
+no_ambiguous = true
+each = true
+no_repeat = false
+unique = false
+```
+
+The command line overrides the file, and the file overrides the built-in
+defaults. `-n` and `-c` win whenever they are given, even at their default
+value (`-n 16` beats `length = 24`). A flag such as `-e` can only turn its
+option on. Characters go as a whole: `-s` or `--custom` (even `--custom ''`)
+replaces both the file's `charsets` and its `custom`, and a file with only
+`custom = "abc"` draws from `abc` alone. `--no-config` ignores the file
+entirely, so the run starts from the built-in defaults.
+
+A broken file is an error that names the file and the key, such as
+`jumble: error: /home/me/.config/jumble/config.toml: length: length must be at
+least 1`, even when the command line overrides that key; fix the file or pass
+`--no-config`. Rules that tie settings together are checked on the result
+instead: `each = true` is fine in the file until `-n 2` asks for two
+characters from three sets.
 
 ### The TUI
 
