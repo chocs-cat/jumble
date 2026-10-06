@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
 
@@ -140,10 +141,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     st = strength(settings)
     text = json_output(strings, settings, st) if args.json else "".join(f"{s}\n" for s in strings)
     data = text.encode()
+    to_stdout = args.output is None or args.output == "-"
     try:
         write_output(args.output, data)
     except OSError as e:
-        print(f"jumble: error: can't write {args.output}: {e.strerror}", file=sys.stderr)
+        if not to_stdout:
+            print(f"jumble: error: can't write {args.output}: {e.strerror}", file=sys.stderr)
+        elif isinstance(e, BrokenPipeError):
+            # The reader closed the pipe and got what it asked for: exit quietly (§6, DEC-14).
+            quiet_stdout()
+        else:
+            print(f"jumble: error: can't write stdout: {e.strerror}", file=sys.stderr)
         return 1
     if args.strength:
         # After the output, and only for a run that succeeded (§4.3).
@@ -176,3 +184,14 @@ def write_output(path: str | None, data: bytes) -> None:
         return
     with open(path, "wb") as f:
         f.write(data)
+
+
+def quiet_stdout() -> None:
+    """Point fd 1 at the null device after a closed pipe (DEC-14).
+
+    Stdout's buffer may still hold bytes; the flush at interpreter exit then
+    has somewhere to go instead of printing `Exception ignored … BrokenPipeError`.
+    This is the recipe in the Python `signal` docs' note on SIGPIPE.
+    """
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())

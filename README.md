@@ -47,7 +47,9 @@ With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 first set of the table below, with `--custom` last; a choice left with no
 characters of its own is an error. Each character is one Unicode code point,
 so `--custom` rejects control and combining characters. Errors print
-`jumble: error: …` and exit 2; a file `-o` can't write exits 1.
+`jumble: error: …` and exit 2; a failed write, to an `-o` file or to stdout,
+exits 1. When a pipe's reader stops early (`jumble -c 100000 | head -1`),
+jumble exits 1 without a message.
 
 jumble generates every string before writing any, so a failed run prints
 nothing and leaves an existing `-o` file as it was. Output is UTF-8, on stdout

@@ -1,5 +1,8 @@
+import errno
 import io
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -167,6 +170,51 @@ def test_unwritable_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     code, lines, err = run(["-o", str(out)], capsys)
     assert (code, lines) == (1, [])
     assert err == f"jumble: error: can't write {out}: No such file or directory\n"
+
+
+def test_closed_pipe_exits_quietly() -> None:
+    # A real pipe: only a subprocess shows the exit-time flush (DEC-14).
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "jumble", "-c", "200000"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert proc.stdout is not None and proc.stderr is not None
+    assert len(proc.stdout.readline()) == 17
+    proc.stdout.close()
+    err = proc.stderr.read()
+    assert (proc.wait(timeout=30), err) == (1, b"")
+
+
+def test_pipe_closed_before_writing_exits_quietly() -> None:
+    # Output smaller than stdout's buffer stays in it after the failed flush,
+    # and only fd 1 on the null device keeps the exit-time flush quiet (DEC-14).
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "jumble"],
+            stdout=write_end,
+            stderr=subprocess.PIPE,
+            timeout=30,
+        )
+    finally:
+        os.close(write_end)
+    assert (proc.returncode, proc.stderr) == (1, b"")
+
+
+class FullDisk(io.BytesIO):
+    def write(self, data: Any) -> int:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+
+@pytest.mark.parametrize("argv", [[], ["-o", "-"]])
+def test_unwritable_stdout(
+    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(FullDisk()))
+    assert main(argv) == 1
+    assert capsys.readouterr().err == "jumble: error: can't write stdout: No space left on device\n"
 
 
 JSON_KEYS = ["strings", "alphabet_size", "strength_bits", "strength_is_bound", "settings"]
