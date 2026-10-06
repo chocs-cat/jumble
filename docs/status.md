@@ -1,14 +1,14 @@
 # Status
 
-Last updated 2026-10-06 by `relay-setup`.
+Last updated 2026-10-06 by `relay-project`.
 Last review: none yet.
 
 ## Where this stands
 
-- The relay workflow was set up on 2026-10-06. No project is active and no
-  chunk is in flight.
-- **Do next:** `/relay-project <idea>` to shape the first project, or
-  `/relay-next` with a request for a small, already-designed fix.
+- The relay workflow was set up on 2026-10-06.
+- Project P0001 (full generator) became active on 2026-10-06; its design is in
+  `docs/spec.md` and DEC-2 – DEC-13. No chunk is in flight.
+- **Do next:** `/relay-next` to cut P0001's first chunk (delivery item D1).
 
 ## In flight
 
