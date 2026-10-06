@@ -355,3 +355,64 @@ def test_misuse_with_tui(
     assert err.startswith("usage:")
     assert err.endswith(f"jumble: error: {option} can't be used with tui\n")
     assert list(tmp_path.iterdir()) == []
+
+
+class Launched:
+    """Patches `JumbleApp.run` to record the app instead of running it."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from jumble.tui import JumbleApp
+
+        self.apps: list[Any] = []
+        monkeypatch.setattr(JumbleApp, "run", lambda app: self.apps.append(app))
+
+
+@pytest.mark.parametrize(
+    ("argv", "start"),
+    [
+        (["-n", "32", "-s", "digits", "tui"], Settings(length=32, charsets=("digits",))),
+        (["tui"], Settings()),
+        (["--custom", "abc", "tui"], Settings(charsets=(), custom="abc")),
+        # Bad values the controls can hold start the TUI (§7.5, DEC-16).
+        (["-n", "0", "tui"], Settings(length=0)),
+    ],
+)
+def test_tui_starts_from_the_options(
+    argv: list[str], start: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    launched = Launched(monkeypatch)
+    assert main(argv) == 0
+    assert [app.initial for app in launched.apps] == [start]
+
+
+@pytest.mark.parametrize(
+    ("argv", "name"),
+    [
+        (["-s", "foo", "tui"], "foo"),
+        (["-s", "lower,", "tui"], ""),
+        (["-s", "digits", "-s", "bar,baz", "tui"], "bar"),
+    ],
+)
+def test_tui_rejects_unknown_sets(
+    argv: list[str],
+    name: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    launched = Launched(monkeypatch)
+    code, lines, err = run(argv, capsys)
+    assert (code, lines) == (2, [])
+    assert err == f"jumble: error: unknown character set: '{name}'\n"
+    assert launched.apps == []
+
+
+def test_tui_help_says_options_set_its_start(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["tui", "--help"])
+    out = " ".join(capsys.readouterr().out.split())
+    assert "Options given before tui set its starting values" in out
+    assert "jumble -n 32 -s digits tui" in out
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    out = " ".join(capsys.readouterr().out.split())
+    assert "starting from the options before tui" in out

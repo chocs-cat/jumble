@@ -1,10 +1,16 @@
+import errno
+import time
+from collections.abc import Iterator
 from importlib.metadata import version
+from pathlib import Path
+from typing import Any
 
 import pytest
 from textual.pilot import Pilot
 from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
 
-from jumble.generate import CHARSETS
+from jumble import tui
+from jumble.generate import CHARSETS, JumbleError, Settings
 from jumble.tui import JumbleApp
 
 
@@ -172,8 +178,13 @@ class Recorder:
     def __init__(self, app: JumbleApp, monkeypatch: pytest.MonkeyPatch) -> None:
         self.copied: list[str] = []
         self.toasts: list[str] = []
+        self.severities: list[str] = []
         monkeypatch.setattr(app, "copy_to_clipboard", self.copied.append)
-        monkeypatch.setattr(app, "notify", lambda message, **_: self.toasts.append(message))
+        monkeypatch.setattr(app, "notify", self.notify)
+
+    def notify(self, message: str, *, severity: str = "information", **_: object) -> None:
+        self.toasts.append(message)
+        self.severities.append(severity)
 
 
 async def test_more_than_1000_strings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -299,4 +310,230 @@ async def test_footer_keys() -> None:
         # Results-pane focus, as at start: the screen's bindings, not an input's.
         bindings = app.screen.active_bindings.values()
         shown = [(a.binding.key, a.binding.description) for a in bindings if a.binding.show]
-        assert shown == [("g", "Jumble"), ("c", "Copy"), ("a", "Copy all"), ("q", "Quit")]
+        assert shown == [
+            ("g", "Jumble"),
+            ("c", "Copy"),
+            ("a", "Copy all"),
+            ("s", "Save"),
+            ("q", "Quit"),
+        ]
+
+
+GAVE_UP = "gave up after 100000 draws with 9 of 10 unique strings"
+
+
+def give_up(_settings: object) -> list[str]:
+    raise JumbleError(GAVE_UP)
+
+
+async def test_a_give_up_is_a_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await set_value(pilot, "#count", "3")
+        await pilot.press("g", "down")
+        before, strings = results(app), list(app.strings)
+        monkeypatch.setattr(tui, "generate", give_up)
+        await pilot.press("g")
+        await pilot.pause()
+        assert app.is_running
+        assert results(app) == before
+        assert app.strings == strings
+        assert app.query_one("#results", OptionList).highlighted == 1
+        assert banner(app) is None
+        assert (record.toasts, record.severities) == ([GAVE_UP], ["error"])
+
+
+async def test_a_give_up_through_enter_is_a_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        before = results(app)
+        monkeypatch.setattr(tui, "generate", give_up)
+        app.query_one("#length", Input).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.is_running
+        assert results(app) == before
+        assert app.query_one("#results", OptionList).highlighted == 0
+        assert banner(app) is None
+        assert (record.toasts, record.severities) == ([GAVE_UP], ["error"])
+
+
+def selected(app: JumbleApp) -> list[str]:
+    return list(app.query_one("#charsets", SelectionList).selected)
+
+
+async def test_starting_values() -> None:
+    app = JumbleApp(Settings(length=32, charsets=("digits",)))
+    async with app.run_test():
+        assert app.query_one("#length", Input).value == "32"
+        assert selected(app) == ["digits"]
+        assert app.sub_title == "10 characters · 106.3 bits per string"
+        assert banner(app) is None
+        rows = results(app)
+        assert len(rows) == 1
+        assert len(rows[0]) == 32 and rows[0].isdigit()
+
+
+async def test_every_option_and_custom_reach_their_control() -> None:
+    start = Settings(
+        count=3,
+        charsets=("lower", "greek"),
+        custom="xyz!",
+        no_ambiguous=True,
+        each=True,
+        no_repeat=True,
+        unique=True,
+    )
+    app = JumbleApp(start)
+    async with app.run_test():
+        assert app.query_one("#count", Input).value == "3"
+        assert app.query_one("#custom", Input).value == "xyz!"
+        assert selected(app) == ["lower", "greek"]
+        for wid in ("no-ambiguous", "each", "no-repeat", "unique"):
+            assert app.query_one(f"#{wid}", Checkbox).value is True
+        assert app.settings() == start
+        assert len(app.strings) == 3
+
+
+async def test_custom_alone_starts_with_no_sets() -> None:
+    app = JumbleApp(Settings(charsets=(), custom="ab"))
+    async with app.run_test():
+        assert selected(app) == []
+        assert app.sub_title == "2 characters · 16.0 bits per string"
+        assert set(results(app)[0]) <= {"a", "b"}
+
+
+async def test_an_invalid_start_shows_the_banner_and_no_strings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = JumbleApp(Settings(length=0))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        assert banner(app) == "length must be at least 1"
+        assert app.sub_title == ""
+        assert results(app) == []
+        assert app.strings == []
+        await pilot.press("g", "c", "a")
+        assert (record.copied, record.toasts) == ([], [])
+        assert results(app) == []
+
+
+NAME = "jumble-1760000000-1500.txt"
+
+
+@pytest.fixture
+def here(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """An empty working directory, and a clock at 1760000000.7 for a known name (§7.3)."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(time, "time", lambda: 1760000000.7)
+    return tmp_path
+
+
+def lines(strings: list[str]) -> bytes:
+    return "".join(f"{s}\n" for s in strings).encode()
+
+
+async def test_s_saves_every_string(here: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp(Settings(count=1500))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("s")
+        assert [p.name for p in here.iterdir()] == [NAME]
+        data = (here / NAME).read_bytes()
+        assert len(app.strings) == 1500
+        assert data == lines(app.strings)
+        assert len(data.splitlines()) == 1500
+        assert (record.toasts, record.severities) == ([f"Saved {NAME}"], ["information"])
+
+
+async def test_s_never_overwrites(here: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp(Settings(count=1500))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("s")
+        saved = (here / NAME).read_bytes()
+        await pilot.press("g", "s")
+        assert (here / NAME).read_bytes() == saved
+        assert record.toasts[-1] == f"{NAME} exists; nothing saved"
+        assert record.severities[-1] == "error"
+
+
+@pytest.fixture
+def read_only(here: Path) -> Iterator[Path]:
+    here.chmod(0o500)
+    try:
+        yield here
+    finally:
+        here.chmod(0o700)
+
+
+async def test_s_in_a_read_only_directory(read_only: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp(Settings(count=1500))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("s")
+        assert list(read_only.iterdir()) == []
+        assert record.toasts == [f"can't save {NAME}: Permission denied"]
+        assert record.severities == ["error"]
+
+
+class FullDisk:
+    """A file opened as asked whose writes fail with ENOSPC."""
+
+    def __init__(self, name: str, mode: str) -> None:
+        self.file = open(name, mode)  # noqa: SIM115
+
+    def __enter__(self) -> "FullDisk":
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.file.close()
+
+    def write(self, _data: bytes) -> int:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+
+async def test_a_failed_write_leaves_no_partial_file(
+    here: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(count=1500))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        monkeypatch.setattr(tui, "open", FullDisk, raising=False)
+        await pilot.press("s")
+        assert list(here.iterdir()) == []
+        assert record.toasts == [f"can't save {NAME}: No space left on device"]
+        assert record.severities == ["error"]
+
+
+async def test_s_saves_emoji_as_utf8(here: Path) -> None:
+    app = JumbleApp(Settings(count=3, charsets=(), custom="🐀🐁🐂"))
+    async with app.run_test() as pilot:
+        await pilot.press("s")
+        data = (here / "jumble-1760000000-3.txt").read_bytes()
+        assert data == lines(app.strings)
+        assert set(data.decode("utf-8")) <= set("🐀🐁🐂\n")
+
+
+async def test_s_while_invalid_saves_the_last_result(here: Path) -> None:
+    app = JumbleApp(Settings(count=2))
+    async with app.run_test() as pilot:
+        last = list(app.strings)
+        await set_value(pilot, "#length", "0")
+        await set_value(pilot, "#count", "7")
+        app.query_one("#results", OptionList).focus()
+        await pilot.press("s")
+        assert (here / "jumble-1760000000-2.txt").read_bytes() == lines(last)
+
+
+async def test_s_before_any_strings_saves_nothing(
+    here: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(length=0))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("s")
+        assert list(here.iterdir()) == []
+        assert record.toasts == []

@@ -201,3 +201,19 @@ those values can't be corrected. Added at the cut of P0001-C04.
 
 *Where:* docs/spec.md §7.5.
 
+## DEC-17: A settings file is checked key by key and fails whole (2026-10)
+
+Reading the settings file stops at its first error, and the error is about
+the file: the file's own syntax, or one key's name, type, or value under that
+key's rule alone. Rules that relate settings to each other are checked on the
+effective settings, because a file with `each = true` is fine until a command
+line asks for `-n 2`. A file error stops the command line even when the
+command line overrides the bad key: skipping bad keys, or ignoring them when
+overridden, would let a typo sit unnoticed in the file. The TUI instead
+starts as if `--no-config` were given and toasts the message, so the settings
+screen can repair the file (§7.4). Messages share one shape, `PATH: KEY:
+MESSAGE`, reusing §6's messages so they have one home. Collecting every error
+at once was the alternative; a settings file has eight keys, and one error
+at a time is what the command line does too. Added at the cut of P0001-C05.
+
+*Where:* docs/spec.md §5.1, §5.2, §6, §7.4.

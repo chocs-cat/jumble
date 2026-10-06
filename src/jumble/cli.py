@@ -12,6 +12,7 @@ from jumble.generate import (
     JumbleError,
     Settings,
     Strength,
+    check_names,
     generate,
     settings_dict,
     strength,
@@ -88,7 +89,11 @@ def parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="command")
     sub.add_parser(
-        "tui", help="open the interactive generator (not with --output, --json, or --strength)"
+        "tui",
+        help="open the interactive generator, starting from the options before tui "
+        "(not with --output, --json, or --strength)",
+        description="Open the interactive generator. Options given before tui set its "
+        "starting values, for example: jumble -n 32 -s digits tui",
     )
     return p
 
@@ -124,9 +129,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         for option, given in misused:
             if given:
                 p.error(f"{option} can't be used with tui")
+        settings = settings_from(args)
+        try:
+            # Only a name no checkbox can hold stops the TUI; any other bad
+            # value starts it with the banner shown (§7.5, DEC-16).
+            check_names(settings.charsets)
+        except JumbleError as e:
+            print(f"jumble: error: {e}", file=sys.stderr)
+            return 2
         from jumble.tui import JumbleApp
 
-        JumbleApp().run()
+        JumbleApp(settings).run()
         return 0
     # Generate everything before opening any output, so a failed run writes
     # nothing and leaves an existing -o file as it was (§4.1, DEC-8).

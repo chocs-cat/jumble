@@ -1,5 +1,8 @@
 """The interactive generator (docs/spec.md §7): controls beside results, live validation."""
 
+import contextlib
+import os
+import time
 from importlib.metadata import version
 from typing import ClassVar
 
@@ -55,32 +58,39 @@ class JumbleApp(App[None]):
         ("g", "jumble", "Jumble"),
         ("c", "copy", "Copy"),
         ("a", "copy_all", "Copy all"),
+        ("s", "save", "Save"),
         ("q", "quit", "Quit"),
         Binding("escape", "focus_results", show=False),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings = DEFAULTS) -> None:
+        """`settings` are the controls' starting values, as given: the caller fills
+        the default sets (§5.2, §7.5, DEC-9)."""
         super().__init__()
+        self.initial = settings
         self.title = f"jumble {version('jumble')}"
         self.strings: list[str] = []
         self.valid = False
 
     def compose(self) -> ComposeResult:
+        # The starting values go in here, not in `on_mount`, so the first
+        # `check` sees them (§7.5).
+        start = self.initial
         yield Header()
         yield Static(id="error")
         with Horizontal():
             with VerticalScroll(id="controls"):
                 with Horizontal(id="numbers"):
-                    yield Input(str(DEFAULTS.length), id="length", type="integer")
-                    yield Input(str(DEFAULTS.count), id="count", type="integer")
+                    yield Input(str(start.length), id="length", type="integer")
+                    yield Input(str(start.count), id="count", type="integer")
                 yield SelectionList[str](
-                    *((name, name, name in DEFAULTS.charsets) for name in CHARSETS),
+                    *((name, name, name in start.charsets) for name in CHARSETS),
                     id="charsets",
                 )
-                yield Input(DEFAULTS.custom, id="custom")
+                yield Input(start.custom, id="custom")
                 with Grid(id="options"):
                     for widget_id, label, setting in OPTIONS:
-                        yield Checkbox(label, getattr(DEFAULTS, setting), id=widget_id)
+                        yield Checkbox(label, getattr(start, setting), id=widget_id)
             # Strings can hold `[`, so they are shown as text, not markup.
             yield OptionList(id="results", markup=False)
         yield Footer()
@@ -88,6 +98,7 @@ class JumbleApp(App[None]):
     def on_mount(self) -> None:
         for selector, title in TITLES:
             self.query_one(selector).border_title = title
+        # An invalid start shows the banner and jumbles nothing (§7.2, §7.5).
         self.check()
         self.action_jumble()
 
@@ -141,7 +152,14 @@ class JumbleApp(App[None]):
         """Generate with the controls and replace the results; nothing while invalid."""
         if not self.valid:
             return
-        self.strings = generate(self.settings())
+        try:
+            strings = generate(self.settings())
+        except JumbleError as e:
+            # Only `unique`'s give-up gets past `check`: a toast, and the last
+            # result, rows, and cursor stay; the banner is for the controls (§7.1, DEC-15).
+            self.notify(str(e), severity="error")
+            return
+        self.strings = strings
         rows: list[str | Option] = list(self.strings[:SHOWN])
         if len(self.strings) > SHOWN:
             # Disabled, so the cursor skips it (§7.1, DEC-11).
@@ -151,8 +169,8 @@ class JumbleApp(App[None]):
         pane.set_options(rows)
         pane.highlighted = 0
 
-    # Copying uses the last jumble's strings, valid controls or not; before
-    # any jumble there is nothing to copy (§7.1, §7.2).
+    # Copying and saving use the last jumble's strings, valid controls or
+    # not; before any jumble there is nothing to copy or save (§7.1, §7.2).
 
     def action_copy(self) -> None:
         index = self.query_one("#results", OptionList).highlighted
@@ -168,3 +186,31 @@ class JumbleApp(App[None]):
         self.copy_to_clipboard("\n".join(self.strings))
         n = len(self.strings)
         self.notify(f"Copied {n} string" if n == 1 else f"Copied {n} strings")
+
+    def action_save(self) -> None:
+        """Write every string to a new `jumble-<epoch>-<count>.txt` here (§7.3, DEC-13)."""
+        if not self.strings:
+            return
+        name = f"jumble-{int(time.time())}-{len(self.strings)}.txt"
+        # The same bytes as the command line's lines output (§4.1).
+        data = "".join(f"{s}\n" for s in self.strings).encode()
+        try:
+            # One exclusive create, so an existing file is never replaced (§7.3).
+            f = open(name, "xb")  # noqa: SIM115
+        except FileExistsError:
+            self.notify(f"{name} exists; nothing saved", severity="error")
+            return
+        except OSError as e:
+            self.notify(f"can't save {name}: {e.strerror}", severity="error")
+            return
+        try:
+            with f:
+                f.write(data)
+        except OSError as e:
+            # The exclusive create made this file, so removing it removes only
+            # the partial save (§7.3).
+            with contextlib.suppress(OSError):
+                os.remove(name)
+            self.notify(f"can't save {name}: {e.strerror}", severity="error")
+            return
+        self.notify(f"Saved {name}")

@@ -26,6 +26,7 @@ jumble --custom 'ACGT' -n 40    # only the characters you give
 jumble -s emoji-animals -n 4 -r # four different animals
 jumble -s digits -n 4 -c 20 -u  # twenty different four-digit codes
 jumble tui                      # pick the length and character sets interactively
+jumble -n 32 -s digits tui      # the same, starting from 32 digits
 ```
 
 | Option | Effect |
@@ -114,17 +115,21 @@ with `tui`.
 
 ### The TUI
 
-`jumble tui` opens the generator in the terminal. On the left are the
-controls: length and count, every character set in the table above to check
-or uncheck, custom characters, and the four options (No look-alikes, One from
-each set, No repeats, All unique). On the right are the strings, one per row.
-The header shows the alphabet size and strength for the controls as they
-stand, updated as you change them. When the controls can't produce strings, a
-banner under the header says why, with the same message the command line
-would print, and the strength disappears until you fix them. Changing a
-control leaves the strings alone; only a jumble replaces them. The list shows
-the first 1000 strings and says how many more there are; copying all takes
-every one.
+`jumble tui` opens the generator in the terminal. Options given before `tui`
+set its starting values: `jumble -n 32 -s digits tui` opens on 32-digit
+strings. An unknown set name is an error before the TUI opens; any other value
+it can't use (`-n 0`) opens it with the banner showing, to fix there.
+
+On the left are the controls: length and count, every character set in the
+table above to check or uncheck, custom characters, and the four options (No
+look-alikes, One from each set, No repeats, All unique). On the right are the
+strings, one per row. The header shows the alphabet size and strength for the
+controls as they stand, updated as you change them. When the controls can't
+produce strings, a banner under the header says why, with the same message the
+command line would print, and the strength disappears until you fix them.
+Changing a control leaves the strings alone; only a jumble replaces them. The
+list shows the first 1000 strings and says how many more there are; copying all
+and saving take every one.
 
 The keys are listed in the footer:
 
@@ -133,11 +138,18 @@ The keys are listed in the footer:
 | `g` | jumble a new batch with the current controls (not while the banner shows) |
 | `c` | copy the string under the cursor |
 | `a` | copy all strings, one per line |
+| `s` | save all strings to a new file, `jumble-<epoch>-<count>.txt`, in the current directory |
 | `q` | quit |
 
 Focus starts on the strings, so the keys work. In a text box, `enter`
 jumbles (as `g` does) and returns to the strings, and `escape` returns without
-jumbling. While the banner shows, `c` and `a` copy the last batch.
+jumbling. While the banner shows, `c`, `a`, and `s` use the last batch.
+
+`s` never overwrites: if the file exists (a second save in the same second),
+it saves nothing and says so. The file holds the same bytes as `jumble`'s
+output: UTF-8, one string per line.
+
+![The jumble TUI: controls on the left, ten strings on the right](docs/tui.svg)
 
 ## Development
 
