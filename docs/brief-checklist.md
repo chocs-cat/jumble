@@ -45,3 +45,20 @@ the brief or with another entry, amend the entry in place before cutting.
 `secrets.randbelow`, with no `secrets.choice`, citing DEC-1 and DEC-6; DEC-1
 said characters are drawn "with `secrets.choice`". The executor followed
 DEC-6 and reported it; DEC-1 was amended in the review.
+
+### §2. A failure pinned for one branch, its sibling left open
+
+**Shape:** the docs or the brief fix the error behavior of one branch of an
+either/or (writing to a file) and say nothing about the other (writing to
+stdout), though both run through the same code. The executor builds the
+pinned branch, the other inherits its handler by accident, and no test drives
+it.
+
+**Check:** for every failure a brief pins, name the code path it runs
+through and list that path's other branches; pin each branch's failure, or
+put it in *Out of scope* by name.
+
+**Provenance:** P0001-C02. Spec §6 and unit a pinned `can't write FILE:
+REASON` for `-o FILE`; nothing covered a failed write to stdout, which then
+printed `can't write None: Broken pipe` (`review-checklist §1`). DEC-14
+pinned it at the review.

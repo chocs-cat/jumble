@@ -162,3 +162,17 @@ typed by the user and overwrites, like shell redirection. Added during project
 P0001.
 
 *Where:* docs/spec.md §4.1, §7.3.
+
+## DEC-14: A closed stdout pipe stops jumble quietly (2026-10)
+
+When the reader of a pipe closes it early (`jumble -c 100000 | head -1`),
+jumble exits 1 with nothing on stderr, as Unix tools that die of `SIGPIPE`
+do; the reader got what it asked for, and a message would land in the middle
+of the terminal output for no reason. Any other failed write to stdout (a full
+disk behind a redirect) is `can't write stdout: REASON`, exit 1, the same
+shape as a file's. Exit 141 (dying of the signal itself) was the alternative;
+it needs a signal handler in Python and tells a script nothing that exit 1
+doesn't. Added at the review of P0001-C02, which found the stdout path
+reporting `can't write None`.
+
+*Where:* docs/spec.md §4.1, §6.

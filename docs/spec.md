@@ -157,7 +157,9 @@ jumble generates every string before writing anything, so a failed run writes
 nothing and never leaves a partial file (DEC-8). Lines output is each string
 followed by `\n`. Output is UTF-8 on stdout as in a file, whatever the
 locale's encoding. `-o FILE` creates or overwrites `FILE`, as shell
-redirection would; `-o -` is stdout.
+redirection would; `-o -` is stdout. A failed write is an error (§6); when
+stdout is a pipe whose reader has closed it (`jumble -c 100000 | head -1`),
+jumble stops quietly (DEC-14).
 
 ### 4.2 JSON
 
@@ -165,13 +167,26 @@ One object, followed by `\n`, to stdout or the `-o` file:
 
 ```json
 {
-  "strings": ["…"],
+  "strings": [
+    "…"
+  ],
   "alphabet_size": 62,
   "strength_bits": 95.3,
   "strength_is_bound": false,
-  "settings": {"length": 16, "count": 1, "charsets": ["lower", "upper", "digits"],
-               "custom": "", "no_ambiguous": false, "each": false,
-               "no_repeat": false, "unique": false}
+  "settings": {
+    "length": 16,
+    "count": 1,
+    "charsets": [
+      "lower",
+      "upper",
+      "digits"
+    ],
+    "custom": "",
+    "no_ambiguous": false,
+    "each": false,
+    "no_repeat": false,
+    "unique": false
+  }
 }
 ```
 
@@ -249,7 +264,11 @@ above and settings-file errors that line is the whole output; for misused
 options argparse's usage line comes first, as argparse prints it. A file it
 cannot write is `jumble: error: can't write FILE: REASON`, exit 1, where
 `FILE` is the path as given and `REASON` is the operating system's error
-text (Python's `OSError.strerror`, for example `Permission denied`).
+text (Python's `OSError.strerror`, for example `Permission denied`). A
+failed write to stdout (no `-o`, or `-o -`) is
+`jumble: error: can't write stdout: REASON`, exit 1, except a closed pipe
+(`BrokenPipeError`), which exits 1 with nothing on stderr: no message, no
+traceback, and no `Exception ignored` line at exit (DEC-14).
 
 ## 7. Terminal UI
 
@@ -261,7 +280,7 @@ as the command line (`jumble.generate`).
 ### 7.1 Layout
 
 ```text
-                        jumble 0.2.0 • 62 characters · 95.3 bits
+          jumble 0.2.0 — 62 characters · 95.3 bits per string
  length must be at least 1                                   ← error banner, only when invalid
  Length [16      ]  Count [10    ]   │ aB3dE9fGh2JkLmN4
  Sets                                │ pQ7rStUvW8xYz3Ab
@@ -272,33 +291,44 @@ as the command line (`jumble.generate`).
  g Jumble  c Copy  a Copy all  s Save  d Save defaults  , Settings  q Quit
 ```
 
-- Header: `jumble <version>`, and as its dim subtitle the alphabet size and
-  strength in the §4.3 wording, updated as the controls change.
+- Header: the title `jumble <version>`, the installed package's version
+  (`importlib.metadata.version("jumble")`), and as its dim subtitle exactly
+  the §4.3 line (`strength_line`) for the current controls, updated on every
+  change to any control. Textual's header joins them with its own ` — `.
 - Controls pane: length and count inputs, a scrollable list of every named
   set in canonical order to check or uncheck, the custom-characters input, and
-  the four options as checkboxes.
-- Results pane: the latest strings, one per row, with a cursor. It shows at
-  most the first 1000; a final row then reads `… and N more (s saves all)`.
-  Copy all and save always use every string (DEC-11).
-- Error banner: the §6 message while the controls are invalid; hidden
-  otherwise. While they are invalid, `g` does nothing, the header's subtitle
-  is empty, and copying and saving use the last result's strings.
+  the four options as checkboxes. A length or count input that doesn't parse
+  as an integer (empty, or `-` alone) counts as 0, so it shows §6's
+  `at least 1` message.
+- Results pane: the latest strings, one per row, with a cursor, which goes to
+  the first string after each jumble. It shows at most the first 1000; a
+  final row then reads `… and N more (s saves all)` and can't be highlighted.
+  Copy all and save always use every string (DEC-11). Changing a control
+  doesn't change the results; only a jumble does.
+- Error banner: the §6 message (from `validate`) while the controls are
+  invalid; hidden otherwise. While they are invalid, `g` does nothing, the
+  header's subtitle is empty, and copying and saving use the last result's
+  strings.
 
 ### 7.2 Keys
 
 | Key | Action |
 |---|---|
 | `g` | jumble: generate with the current controls |
-| `c` | copy the string under the cursor |
-| `a` | copy all strings, one per line |
+| `c` | copy the string under the cursor; the toast says `Copied` |
+| `a` | copy all strings, one per line; the toast says `Copied N strings` (`Copied 1 string` for one) |
 | `s` | save all strings to a new file (§7.3) |
 | `d` | save the current controls as the defaults (§7.4) |
 | `,` | open the settings screen (§7.4) |
 | `q` | quit |
 
+Until a jumble has produced strings (the TUI can start with invalid
+controls, §7.5), `c`, `a`, and `s` do nothing.
+
 The TUI starts with focus on the results pane and jumbles once at start. An
-input swallows letter keys, so in an input `enter` jumbles and moves focus to
-the results pane, and `escape` moves focus there without jumbling. There is no
+input swallows letter keys, so in an input `enter` jumbles (as `g` does, so
+not while the controls are invalid) and moves focus to the results pane, and
+`escape` moves focus there without jumbling. There is no
 Jumble button (DEC-12).
 
 ### 7.3 Saving strings
