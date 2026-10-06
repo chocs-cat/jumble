@@ -309,6 +309,9 @@ as the command line (`jumble.generate`).
   invalid; hidden otherwise. While they are invalid, `g` does nothing, the
   header's subtitle is empty, and copying and saving use the last result's
   strings.
+- A jumble that stops with §3.4's give-up error leaves the results and the
+  cursor as they were and shows the §6 message in an error toast; the
+  controls stay valid, so the banner stays hidden (DEC-15).
 
 ### 7.2 Keys
 
@@ -334,9 +337,15 @@ Jumble button (DEC-12).
 ### 7.3 Saving strings
 
 `s` writes every string, one per line, to `jumble-<epoch>-<count>.txt` in the
-current directory, where `<epoch>` is Unix seconds, and confirms the path in a
-toast. If that file exists it writes nothing and says so; it never overwrites
-(DEC-13).
+current directory, where `<epoch>` is Unix seconds (`int(time.time())`) and
+`<count>` is the number of strings saved, which is the last result's even
+while the controls are invalid. The file holds the same bytes as `jumble`'s
+lines output (§4.1): UTF-8, each string followed by `\n`. The toast is
+`Saved NAME`, where `NAME` is the file name as written. If that file exists it
+writes nothing and the error toast is `NAME exists; nothing saved`: it never
+overwrites (DEC-13), and the check and the write are one exclusive create, so
+no race can replace a file. Any other failed write is the error toast
+`can't save NAME: REASON`, with `REASON` as in §6, and leaves no partial file.
 
 ### 7.4 Saving defaults
 
@@ -355,4 +364,10 @@ and shows the error in a toast; saving replaces the invalid values.
 ### 7.5 Starting values
 
 The TUI's controls start from the effective settings (§5.2), including any
-options given before `tui` on the command line.
+options given before `tui` on the command line; with no `-s` and no
+`--custom`, the default sets are checked, as on the command line. Before the
+TUI starts, the command line rejects what the controls can't hold: an unknown
+or empty `-s` name is §6's `unknown character set: 'NAME'`, exit 2, naming the
+first such name as given. Any other invalid starting value starts the TUI with
+the error banner shown and no strings, so `c`, `a`, and `s` do nothing until a
+jumble succeeds (§7.2) (DEC-16).

@@ -176,3 +176,28 @@ doesn't. Added at the review of P0001-C02, which found the stdout path
 reporting `can't write None`.
 
 *Where:* docs/spec.md §4.1, §6.
+
+## DEC-15: A TUI jumble that gives up is a toast, not the banner (2026-10)
+
+`unique`'s give-up (§3.4) can't be checked before drawing, so it can happen
+with controls that validate. The banner means "these controls can't produce
+strings" and clears when a control changes; a give-up is the outcome of one
+draw, and the same controls may succeed next time. So it is an error toast,
+like corral's other outcomes, and the last result stays, so copying and saving
+still have something to use. Raising it unhandled, as the first TUI did, quit
+the app. Added at the review of P0001-C03.
+
+*Where:* docs/spec.md §7.1.
+
+## DEC-16: `jumble … tui` rejects only what the controls can't hold (2026-10)
+
+Options before `tui` become the TUI's starting controls (§7.5). An unknown set
+name has no checkbox to land on, so the command line rejects it with §6's
+message and exit 2, as `jumble -s foo` would. Everything else (`-n 0`,
+`--custom` with a combining character, an impossible `--unique` count) has a
+control that can hold it, so the TUI starts with the banner shown and the
+user fixes it there; rejecting those too would make the TUI the one place
+those values can't be corrected. Added at the cut of P0001-C04.
+
+*Where:* docs/spec.md §7.5.
+
