@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # The job name is the required status check on the default branch, so
+    # rename it only together with the branch protection.
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Reads the Python version from .python-version.
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked
+      - run: make check
