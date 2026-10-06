@@ -1,19 +1,21 @@
 # Status
 
-Last updated 2026-10-06 by `relay-project`.
+Last updated 2026-10-06 by `relay-next`.
 Last review: none yet.
 
 ## Where this stands
 
 - The relay workflow was set up on 2026-10-06.
 - Project P0001 (full generator) became active on 2026-10-06; its design is in
-  `docs/spec.md` and DEC-2 – DEC-13. No chunk is in flight.
-- **Do next:** `/relay-next` to cut P0001's first chunk (delivery item D1).
+  `docs/spec.md` and DEC-2 – DEC-13.
+- P0001-C01 (D1: settings model, sets, generation options) was cut on
+  2026-10-06 and is ready for an executor. D2 – D5 remain.
+- **Do next:** `/relay-execute` to build P0001-C01.
 
 ## In flight
 
-- **Chunk:** —
-- **State:** none
+- **Chunk:** P0001-C01
+- **State:** ready for an executor
 - **Branch:** —
 - **Pull request:** —
 - **Units committed:** —

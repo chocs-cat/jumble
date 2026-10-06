@@ -64,7 +64,8 @@ counts code points.
 
 On the command line, `-s/--charset NAME` chooses a set; repeat it, or separate
 names with commas (`-s lower,digits`). Order and repetition don't matter. An
-unknown name is an error (§6).
+unknown name is an error (§6), and so is an empty one (`-s lower,`). `custom`
+is not a named set; custom characters come only from `--custom`.
 
 ### 2.3 Custom characters
 
@@ -227,9 +228,13 @@ the command line before output. The messages, in this order of checking:
 | `unique` and count > *P* | `only P different strings are possible` |
 | `unique` gave up (§3.4) | `gave up after D draws with N of COUNT unique strings` |
 
+*P*, *D*, *N*, *COUNT*, *K*, and *A* are written as plain decimal integers.
+
 The command line prints `jumble: error: MESSAGE` to stderr and exits 2 for any
-of these, for settings-file errors, and for misused options. A file it cannot
-write is `jumble: error: can't write FILE: REASON`, exit 1.
+of these, for settings-file errors, and for misused options. For the messages
+above and settings-file errors that line is the whole output; for misused
+options argparse's usage line comes first, as argparse prints it. A file it
+cannot write is `jumble: error: can't write FILE: REASON`, exit 1.
 
 ## 7. Terminal UI
 
