@@ -59,28 +59,34 @@ class JumbleApp(App[None]):
         Binding("escape", "focus_results", show=False),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings = DEFAULTS) -> None:
+        """`settings` are the controls' starting values, as given: the caller fills
+        the default sets (§5.2, §7.5, DEC-9)."""
         super().__init__()
+        self.initial = settings
         self.title = f"jumble {version('jumble')}"
         self.strings: list[str] = []
         self.valid = False
 
     def compose(self) -> ComposeResult:
+        # The starting values go in here, not in `on_mount`, so the first
+        # `check` sees them (§7.5).
+        start = self.initial
         yield Header()
         yield Static(id="error")
         with Horizontal():
             with VerticalScroll(id="controls"):
                 with Horizontal(id="numbers"):
-                    yield Input(str(DEFAULTS.length), id="length", type="integer")
-                    yield Input(str(DEFAULTS.count), id="count", type="integer")
+                    yield Input(str(start.length), id="length", type="integer")
+                    yield Input(str(start.count), id="count", type="integer")
                 yield SelectionList[str](
-                    *((name, name, name in DEFAULTS.charsets) for name in CHARSETS),
+                    *((name, name, name in start.charsets) for name in CHARSETS),
                     id="charsets",
                 )
-                yield Input(DEFAULTS.custom, id="custom")
+                yield Input(start.custom, id="custom")
                 with Grid(id="options"):
                     for widget_id, label, setting in OPTIONS:
-                        yield Checkbox(label, getattr(DEFAULTS, setting), id=widget_id)
+                        yield Checkbox(label, getattr(start, setting), id=widget_id)
             # Strings can hold `[`, so they are shown as text, not markup.
             yield OptionList(id="results", markup=False)
         yield Footer()
@@ -88,6 +94,7 @@ class JumbleApp(App[None]):
     def on_mount(self) -> None:
         for selector, title in TITLES:
             self.query_one(selector).border_title = title
+        # An invalid start shows the banner and jumbles nothing (§7.2, §7.5).
         self.check()
         self.action_jumble()
 

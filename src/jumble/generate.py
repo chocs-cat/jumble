@@ -101,6 +101,16 @@ def _custom_chars(custom: str) -> str:
     return "".join(dict.fromkeys(custom))
 
 
+def check_names(charsets: Iterable[str]) -> None:
+    """Raise §6's `unknown character set: 'NAME'` for the first name not in `CHARSETS`.
+
+    An empty name (from `-s lower,`) is unknown too (§2.2).
+    """
+    for name in charsets:
+        if name not in CHARSETS:
+            raise JumbleError(f"unknown character set: '{name}'")
+
+
 def chosen_sets(settings: Settings) -> list[tuple[str, str]]:
     """The chosen sets after §2.4 steps 1–3, as `(name, characters)` pairs.
 
@@ -108,9 +118,7 @@ def chosen_sets(settings: Settings) -> list[tuple[str, str]]:
     Runs the §6 checks from "unknown set name" to "a chosen set is empty", in
     that order.
     """
-    for name in settings.charsets:
-        if name not in CHARSETS:
-            raise JumbleError(f"unknown character set: '{name}'")
+    check_names(settings.charsets)
     custom = _custom_chars(settings.custom)
     if not settings.charsets and not custom:
         raise JumbleError("choose at least one character set")

@@ -5,7 +5,7 @@ from textual.pilot import Pilot
 from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
 
 from jumble import tui
-from jumble.generate import CHARSETS, JumbleError
+from jumble.generate import CHARSETS, JumbleError, Settings
 from jumble.tui import JumbleApp
 
 
@@ -347,3 +347,63 @@ async def test_a_give_up_through_enter_is_a_toast(monkeypatch: pytest.MonkeyPatc
         assert app.query_one("#results", OptionList).highlighted == 0
         assert banner(app) is None
         assert (record.toasts, record.severities) == ([GAVE_UP], ["error"])
+
+
+def selected(app: JumbleApp) -> list[str]:
+    return list(app.query_one("#charsets", SelectionList).selected)
+
+
+async def test_starting_values() -> None:
+    app = JumbleApp(Settings(length=32, charsets=("digits",)))
+    async with app.run_test():
+        assert app.query_one("#length", Input).value == "32"
+        assert selected(app) == ["digits"]
+        assert app.sub_title == "10 characters · 106.3 bits per string"
+        assert banner(app) is None
+        rows = results(app)
+        assert len(rows) == 1
+        assert len(rows[0]) == 32 and rows[0].isdigit()
+
+
+async def test_every_option_and_custom_reach_their_control() -> None:
+    start = Settings(
+        count=3,
+        charsets=("lower", "greek"),
+        custom="xyz!",
+        no_ambiguous=True,
+        each=True,
+        no_repeat=True,
+        unique=True,
+    )
+    app = JumbleApp(start)
+    async with app.run_test():
+        assert app.query_one("#count", Input).value == "3"
+        assert app.query_one("#custom", Input).value == "xyz!"
+        assert selected(app) == ["lower", "greek"]
+        for wid in ("no-ambiguous", "each", "no-repeat", "unique"):
+            assert app.query_one(f"#{wid}", Checkbox).value is True
+        assert app.settings() == start
+        assert len(app.strings) == 3
+
+
+async def test_custom_alone_starts_with_no_sets() -> None:
+    app = JumbleApp(Settings(charsets=(), custom="ab"))
+    async with app.run_test():
+        assert selected(app) == []
+        assert app.sub_title == "2 characters · 16.0 bits per string"
+        assert set(results(app)[0]) <= {"a", "b"}
+
+
+async def test_an_invalid_start_shows_the_banner_and_no_strings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = JumbleApp(Settings(length=0))
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        assert banner(app) == "length must be at least 1"
+        assert app.sub_title == ""
+        assert results(app) == []
+        assert app.strings == []
+        await pilot.press("g", "c", "a")
+        assert (record.copied, record.toasts) == ([], [])
+        assert results(app) == []
