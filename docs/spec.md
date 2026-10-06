@@ -1,0 +1,308 @@
+# jumble specification
+
+How jumble behaves: its character sets, options, output, settings file, and
+terminal UI. This is the first authority for behavior (AGENTS.md, *Relay
+workflow*); README.md is the user guide drawn from it, and the CLI help text and
+docstrings follow both. Decisions behind the rules are cited as `(DEC-n)` from
+`docs/decisions.md`.
+
+## 1. Settings
+
+One set of settings drives every front end. The command line, the settings
+file, the TUI, and `--json` output use the same names (DEC-10):
+
+| Setting | Type | Default | Meaning |
+|---|---|---|---|
+| `length` | integer ≥ 1 | 16 | characters per string |
+| `count` | integer ≥ 1 | 1 | how many strings |
+| `charsets` | list of set names | `["lower", "upper", "digits"]` | the named sets to draw from (§2) |
+| `custom` | string | `""` | extra characters, as their own set (§2.3) |
+| `no_ambiguous` | boolean | false | leave out look-alike characters (§3.1) |
+| `each` | boolean | false | at least one character from every chosen set (§3.3) |
+| `no_repeat` | boolean | false | no character twice within a string (§3.2) |
+| `unique` | boolean | false | no string twice in the output (§3.4) |
+
+The default `charsets` apply only when no characters are chosen at all, that
+is, when both `charsets` and `custom` are empty at every level (§5.2) (DEC-9).
+
+## 2. Character sets
+
+### 2.1 Named sets
+
+Sets are listed here in their **canonical order**, which fixes the order of
+the alphabet and decides overlaps (§2.4). Every character in every set is a
+single Unicode code point that is neither a control, format, nor combining
+character, so a string's length is the number of characters it shows (DEC-4).
+
+| Name | Characters | Size |
+|---|---|---|
+| `lower` | `a`–`z` | 26 |
+| `upper` | `A`–`Z` | 26 |
+| `digits` | `0`–`9` | 10 |
+| `symbols` | all ASCII punctuation, ``!"#$%&'()*+,-./:;<=>?@[\]^_`{\|}~`` (Python's `string.punctuation`) (DEC-2) | 32 |
+| `space` | the space character, U+0020 | 1 |
+| `chess` | U+2654–U+265F (♔…♟) | 12 |
+| `cards` | the 52 standard playing cards: U+1F0A1–U+1F0AE, U+1F0B1–U+1F0BE, U+1F0C1–U+1F0CE, U+1F0D1–U+1F0DE, each range without its knight (U+1F0AC, U+1F0BC, U+1F0CC, U+1F0DC) | 52 |
+| `dice` | U+2680–U+2685 (⚀…⚅) | 6 |
+| `emoji-faces` | U+1F600–U+1F64F (😀…🙏) | 80 |
+| `emoji-animals` | U+1F400–U+1F43E (🐀…🐾) | 63 |
+| `emoji-food` | U+1F345–U+1F37B (🍅…🍻) | 55 |
+| `greek` | U+0391–U+03A9 without U+03A2, then U+03B1–U+03C9 without final sigma U+03C2 (Α…Ω, α…ω) | 48 |
+| `cyrillic` | U+0410–U+044F (А…я) | 64 |
+| `latin-accented` | U+00C0–U+00FF without × U+00D7 and ÷ U+00F7 (À…ÿ) | 62 |
+| `arrows` | U+2190–U+2199 (←…↙) | 10 |
+| `math` | `±×÷∞≠≈≤≥√∑∏∫∂∆∇∈∉∩∪⊂⊃∀∃¬∧∨`, in that order | 26 |
+| `currency` | `¢£¥€₹₽₩₪₺₿₫₱`, in that order | 12 |
+| `box` | U+2500–U+259F, box drawing and block elements (─…▟) | 160 |
+
+Emoji sets hold only single code points with default emoji presentation: no
+skin-tone modifiers, variation selectors, or joined (ZWJ) sequences (DEC-4).
+How a terminal draws wide characters is the terminal's business; jumble
+counts code points.
+
+### 2.2 Choosing sets
+
+On the command line, `-s/--charset NAME` chooses a set; repeat it, or separate
+names with commas (`-s lower,digits`). Order and repetition don't matter. An
+unknown name is an error (§6).
+
+### 2.3 Custom characters
+
+`--custom CHARS` (the `custom` setting) adds the characters of `CHARS` as one
+more set, named `custom`, placed after every named set. Repeated characters
+count once and keep their first position. Each code point is one character.
+A control (Unicode category `Cc`, `Cf`, `Cs`, `Co`, `Cn`) or combining (`M*`)
+character in `CHARS` is an error (§6) (DEC-4).
+
+### 2.4 Building the alphabet
+
+From the chosen sets, in canonical order with `custom` last:
+
+1. When `no_ambiguous` is on, remove the look-alike characters (§3.1) from
+   every set.
+2. Make the sets disjoint: a character that is in more than one chosen set
+   stays only in the first (DEC-5).
+3. If any chosen set is now empty, that is an error (§6). (Only `custom` can
+   empty this way, for example `--custom abc` with `lower` chosen.)
+4. The **alphabet** is the sets' characters joined in that order. Its size is
+   written *A* below.
+
+## 3. Options
+
+Randomness, including every choice, sample, and shuffle, comes from the
+`secrets` module; shuffles and samples are built on `secrets.randbelow`
+(DEC-1, DEC-6).
+
+### 3.1 No look-alikes (`-a`, `--no-ambiguous`)
+
+Removes these characters: ``0 O o l 1 I | ` ' " ; : . , -`` (DEC-3).
+
+### 3.2 No repeats (`-r`, `--no-repeat`)
+
+No character appears twice within one string. Requires *length ≤ A*.
+
+### 3.3 One from each set (`-e`, `--each`)
+
+Every chosen set, `custom` included, contributes at least one character to
+every string. Requires *length ≥* the number of chosen sets. A string is made
+by drawing one character from each set, filling the rest from the whole
+alphabet (without already-drawn characters when `no_repeat` is on), and
+shuffling (DEC-6).
+
+### 3.4 Unique strings (`-u`, `--unique`)
+
+No string appears twice in the output. A string that repeats an earlier one is
+drawn again. If *count* exceeds the number of possible strings (§3.5), that is
+an error before anything is drawn; if `max(100000, 20 × count)` draws pass
+without reaching *count* distinct strings, generation stops with an error (§6)
+(DEC-7).
+
+### 3.5 Strength
+
+The number of possible strings, *P*, is *A^length* with repeats allowed and
+*A! / (A − length)!* with `no_repeat`. Strength is *log₂ P* bits per string,
+reported to one decimal place. It ignores `each`, so with `each` on it is an
+upper bound and is reported as such (DEC-7).
+
+## 4. Command line
+
+```text
+jumble [options]          generate and print strings
+jumble [options] tui      open the TUI, starting from these options (§7)
+```
+
+| Option | Setting / effect |
+|---|---|
+| `-n`, `--length N` | `length` |
+| `-c`, `--count N` | `count` |
+| `-s`, `--charset NAME[,NAME…]` | `charsets` (§2.2) |
+| `--custom CHARS` | `custom` (§2.3) |
+| `-a`, `--no-ambiguous` | `no_ambiguous` |
+| `-e`, `--each` | `each` |
+| `-r`, `--no-repeat` | `no_repeat` |
+| `-u`, `--unique` | `unique` |
+| `-o`, `--output FILE` | write to `FILE` instead of stdout (§4.1); `-` means stdout |
+| `--json` | write JSON instead of lines (§4.2) |
+| `--strength` | also print the strength line to stderr (§4.3) |
+| `--no-config` | ignore the settings file (§5) |
+
+`-o`, `--json`, and `--strength` are errors with `tui` (§6).
+
+### 4.1 Output
+
+jumble generates every string before writing anything, so a failed run writes
+nothing and never leaves a partial file (DEC-8). Lines output is each string
+followed by `\n`, UTF-8. `-o FILE` creates or overwrites `FILE`, as shell
+redirection would.
+
+### 4.2 JSON
+
+One object, followed by `\n`, to stdout or the `-o` file:
+
+```json
+{
+  "strings": ["…"],
+  "alphabet_size": 62,
+  "strength_bits": 95.3,
+  "strength_is_bound": false,
+  "settings": {"length": 16, "count": 1, "charsets": ["lower", "upper", "digits"],
+               "custom": "", "no_ambiguous": false, "each": false,
+               "no_repeat": false, "unique": false}
+}
+```
+
+`settings` holds the effective settings (§5.2), with `charsets` in canonical
+order. `strength_is_bound` is true when `each` is on. Errors are not JSON.
+
+### 4.3 Strength line
+
+`62 characters · 95.3 bits per string`, or with `each` on,
+`62 characters · at most 95.3 bits per string`.
+
+## 5. Settings file
+
+### 5.1 Location and format
+
+`$JUMBLE_CONFIG` if set, else `$XDG_CONFIG_HOME/jumble/config.toml`, else
+`~/.config/jumble/config.toml`, on macOS too (DEC-10). It is TOML with the
+setting names of §1 as top-level keys; every key is optional. A missing file
+means built-in defaults. An unknown key, a wrong type, or a value the rules
+reject is an error naming the file and the key (§6).
+
+### 5.2 Precedence
+
+Built-in defaults, then the settings file, then the command line, each
+overriding the one before (DEC-9):
+
+- `length`, `count`, and the four booleans are taken key by key. A boolean
+  flag can only turn its option on; `--no-config` is the way to start from the
+  built-in defaults.
+- Characters are taken as a whole: if the command line gives `-s` or
+  `--custom`, the file's `charsets` and `custom` are both ignored.
+- If no level chooses any characters, the default `charsets` apply.
+
+### 5.3 Saving
+
+The TUI saves settings (§7.4). A save writes all eight keys, changes only the
+values that differ, and keeps the file's comments and layout; a save with
+nothing changed leaves the file byte for byte as it was. A new file starts
+from a commented template listing every key. A symlinked file is written
+through the link (DEC-10).
+
+## 6. Errors
+
+Validation runs before any drawing, in the TUI as the controls change and on
+the command line before output. The messages, in this order of checking:
+
+| Condition | Message |
+|---|---|
+| length < 1 | `length must be at least 1` |
+| count < 1 | `count must be at least 1` |
+| unknown set name | `unknown character set: 'NAME'` |
+| custom has a control or combining character | `custom characters can't include control or combining characters` |
+| no characters chosen (TUI only; the CLI falls back to defaults) | `choose at least one character set` |
+| a chosen set is empty after §2.4 | `SET has no characters left` (for `custom`: `custom characters are all left out or already chosen`) |
+| `each` and length < number of sets *k* | `length must be at least K to take one character from each of K sets` |
+| `no_repeat` and length > *A* | `length can't be more than A without repeats` |
+| `unique` and count > *P* | `only P different strings are possible` |
+| `unique` gave up (§3.4) | `gave up after D draws with N of COUNT unique strings` |
+
+The command line prints `jumble: error: MESSAGE` to stderr and exits 2 for any
+of these, for settings-file errors, and for misused options. A file it cannot
+write is `jumble: error: can't write FILE: REASON`, exit 1.
+
+## 7. Terminal UI
+
+The TUI follows corral's layout and habits: a one-line header, a controls pane
+beside a results pane, an error banner shown only when needed, toasts for
+outcomes, single-key actions listed in the footer, and the same behavior code
+as the command line (`jumble.generate`).
+
+### 7.1 Layout
+
+```text
+                        jumble 0.2.0 • 62 characters · 95.3 bits
+ length must be at least 1                                   ← error banner, only when invalid
+ Length [16      ]  Count [10    ]   │ aB3dE9fGh2JkLmN4
+ Sets                                │ pQ7rStUvW8xYz3Ab
+  [x] lower   [ ] chess  …           │ …
+ Custom [                ]           │
+ [ ] No look-alikes  [ ] One from each set
+ [ ] No repeats      [ ] All unique  │
+ g Jumble  c Copy  a Copy all  s Save  d Save defaults  , Settings  q Quit
+```
+
+- Header: `jumble <version>`, and as its dim subtitle the alphabet size and
+  strength in the §4.3 wording, updated as the controls change.
+- Controls pane: length and count inputs, a scrollable list of every named
+  set in canonical order to check or uncheck, the custom-characters input, and
+  the four options as checkboxes.
+- Results pane: the latest strings, one per row, with a cursor. It shows at
+  most the first 1000; a final row then reads `… and N more (s saves all)`.
+  Copy all and save always use every string (DEC-11).
+- Error banner: the §6 message while the controls are invalid; hidden
+  otherwise. While they are invalid, `g` does nothing, the header's subtitle
+  is empty, and copying and saving use the last result's strings.
+
+### 7.2 Keys
+
+| Key | Action |
+|---|---|
+| `g` | jumble: generate with the current controls |
+| `c` | copy the string under the cursor |
+| `a` | copy all strings, one per line |
+| `s` | save all strings to a new file (§7.3) |
+| `d` | save the current controls as the defaults (§7.4) |
+| `,` | open the settings screen (§7.4) |
+| `q` | quit |
+
+The TUI starts with focus on the results pane and jumbles once at start. An
+input swallows letter keys, so in an input `enter` jumbles and moves focus to
+the results pane, and `escape` moves focus there without jumbling. There is no
+Jumble button (DEC-12).
+
+### 7.3 Saving strings
+
+`s` writes every string, one per line, to `jumble-<epoch>-<count>.txt` in the
+current directory, where `<epoch>` is Unix seconds, and confirms the path in a
+toast. If that file exists it writes nothing and says so; it never overwrites
+(DEC-13).
+
+### 7.4 Saving defaults
+
+Two routes write the settings file (§5.3) and confirm its path in a toast:
+
+- `d` saves the main screen's current controls as they stand.
+- `,` opens a settings screen: a form with every setting of §1, filled from
+  the settings file (or the built-in defaults), the file's path, and Save and
+  Cancel. Save validates (§6), writes the file, closes the screen, and sets the
+  main screen's controls to the saved values; Cancel and `escape` close it
+  without change. Main-screen keys don't act while it is open.
+
+When the settings file is invalid, the TUI starts from the built-in defaults
+and shows the error in a toast; saving replaces the invalid values.
+
+### 7.5 Starting values
+
+The TUI's controls start from the effective settings (§5.2), including any
+options given before `tui` on the command line.

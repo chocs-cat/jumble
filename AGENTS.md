@@ -4,7 +4,8 @@ Instructions for coding agents. Codex reads this file; Claude Code reads it
 through `CLAUDE.md`'s `@AGENTS.md` import.
 
 jumble is a random string generator for personal use, with a command line
-(`jumble`) and a Textual TUI (`jumble tui`). README.md covers usage.
+(`jumble`) and a Textual TUI (`jumble tui`). `docs/spec.md` defines its
+behavior; README.md covers usage.
 
 ## Before you start
 
@@ -30,8 +31,8 @@ jumble is a random string generator for personal use, with a command line
   chunk branch keep their relay titles (`P0001-C01-a: …`).
 - CI must pass before a merge; don't bypass a failing required check (no
   `gh pr merge --admin`).
-- Keep README.md and the CLI help text in step with any behavior change, in
-  the same pull request.
+- Keep `docs/spec.md`, README.md, and the CLI help text in step with any
+  behavior change, in the same pull request.
 
 ## Roadmap: GitHub Issues
 
@@ -75,8 +76,11 @@ Releases are automated with release-please, from Conventional Commits.
 
 ## Conventions
 
-- Generation logic lives in `src/jumble/generate.py`; `cli.py` and `tui.py`
-  only gather options and call it, so the two front ends can't drift apart.
+- Generation logic lives in `src/jumble/generate.py`: the character sets,
+  the one settings type every front end shares, validation, generation, and
+  strength (DEC-10). The settings file is read and written by
+  `src/jumble/config.py`. The CLI and the TUI only gather settings and call
+  these, so the front ends can't drift apart.
 - Draw randomness from `secrets`, never `random` (DEC-1).
 
 ## Testing notes
@@ -84,8 +88,10 @@ Releases are automated with release-please, from Conventional Commits.
 - TUI tests drive the app with `App.run_test()` and its pilot; async tests
   need no marker (`asyncio_mode = "auto"`).
 - A focused `Input` swallows printable keys, even over priority bindings, so
-  the TUI starts focus on the Jumble button. Tests that press letter keys must
-  not leave an input focused.
+  the TUI starts focus on the results pane (DEC-12). Tests that press letter
+  keys must not leave an input focused.
+- Tests never touch the real settings file: point `$JUMBLE_CONFIG` at a
+  `tmp_path` file (monkeypatch) in any test that loads or saves settings.
 
 ## Relay workflow
 
@@ -127,8 +133,8 @@ said it, and cite the entry at the code site.
 - **Issues:** GitHub Issues, as *Roadmap* describes: review follow-ups and
   ideas are filed as issues, a project or maintenance chunk may start from
   one, and the pull request that finishes it closes it.
-- **Authority:** `README.md`, then the CLI help text and the code's own
-  docstrings.
+- **Authority:** `docs/spec.md`, then `README.md`, then the CLI help text
+  and the code's own docstrings.
 - **Status:** `docs/status.md`
 - **Chunks:** `docs/chunks/<ID>.md`
 - **Decision log:** `docs/decisions.md`, entries cited as `(DEC-n)`
