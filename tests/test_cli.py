@@ -591,3 +591,21 @@ def test_an_unknown_set_still_stops_the_tui_with_a_broken_file(
     code, _, err = run(["-s", "foo", "tui"], capsys)
     assert (code, err) == (2, "jumble: error: unknown character set: 'foo'\n")
     assert launched.apps == []
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        ("colour = 1", "colour: unknown setting"),
+        ("length = true", "length: must be an integer"),
+        ('charsets = ["foo"]', "charsets: unknown character set: 'foo'"),
+    ],
+)
+def test_file_errors_name_the_file_and_key(
+    line: str, message: str, config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text(line + "\n")
+    code = main(["-s", "digits"])
+    out, err = capsys.readouterr()
+    assert (code, out) == (2, "")
+    assert err == f"jumble: error: {config_file}: {message}\n"
