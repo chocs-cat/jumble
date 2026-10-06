@@ -1,34 +1,83 @@
-"""The `jumble` command."""
+"""The `jumble` command (docs/spec.md §4)."""
 
 import argparse
+import sys
 from collections.abc import Sequence
 
-from jumble.generate import CHARSETS, Settings, generate
+from jumble.generate import AMBIGUOUS, CHARSETS, JumbleError, Settings, generate
 
-DEFAULT_CHARSETS = ["lower", "upper", "digits"]
+DEFAULTS = Settings()
 
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jumble", description="Generate random strings.")
     p.add_argument(
-        "-n", "--length", type=int, default=16, help="characters per string (default 16)"
+        "-n",
+        "--length",
+        type=int,
+        default=DEFAULTS.length,
+        metavar="N",
+        help=f"characters per string (default {DEFAULTS.length})",
     )
     p.add_argument(
-        "-c", "--count", type=int, default=1, help="how many strings to print (default 1)"
+        "-c",
+        "--count",
+        type=int,
+        default=DEFAULTS.count,
+        metavar="N",
+        help=f"how many strings to print (default {DEFAULTS.count})",
     )
+    # No argparse choices: validation reports unknown and empty names (§2.2, §6).
     p.add_argument(
         "-s",
         "--charset",
         action="append",
-        choices=sorted(CHARSETS),
-        help="character set to draw from; repeat for more (default: lower, upper, digits)",
+        default=[],
+        metavar="NAME[,NAME...]",
+        help="character sets to draw from; repeat or separate with commas. "
+        f"Sets: {', '.join(CHARSETS)} "
+        f"(default: {', '.join(DEFAULTS.charsets)}, when no --custom is given)",
     )
     p.add_argument(
-        "-a", "--no-ambiguous", action="store_true", help="leave out look-alike characters (Il1O0o)"
+        "--custom",
+        default="",
+        metavar="CHARS",
+        help="also draw from these characters, as one more set",
     )
+    p.add_argument(
+        "-a",
+        "--no-ambiguous",
+        action="store_true",
+        help=f"leave out look-alike characters: {' '.join(sorted(AMBIGUOUS))}",
+    )
+    p.add_argument(
+        "-e", "--each", action="store_true", help="at least one character from every chosen set"
+    )
+    p.add_argument(
+        "-r", "--no-repeat", action="store_true", help="no character twice within a string"
+    )
+    p.add_argument("-u", "--unique", action="store_true", help="no string twice in the output")
     sub = p.add_subparsers(dest="command")
     sub.add_parser("tui", help="open the interactive generator")
     return p
+
+
+def settings_from(args: argparse.Namespace) -> Settings:
+    """One `Settings` from parsed arguments (§1, §2.2)."""
+    charsets = tuple(name for value in args.charset for name in value.split(","))
+    if not charsets and not args.custom:
+        # Nothing chose any characters, so the default sets apply (§1, DEC-9).
+        charsets = DEFAULTS.charsets
+    return Settings(
+        length=args.length,
+        count=args.count,
+        charsets=charsets,
+        custom=args.custom,
+        no_ambiguous=args.no_ambiguous,
+        each=args.each,
+        no_repeat=args.no_repeat,
+        unique=args.unique,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -38,15 +87,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         JumbleApp().run()
         return 0
-    settings = Settings(
-        length=args.length,
-        count=args.count,
-        charsets=tuple(args.charset or DEFAULT_CHARSETS),
-        no_ambiguous=args.no_ambiguous,
-    )
     try:
-        for line in generate(settings):
-            print(line)
-    except ValueError as e:
-        parser().error(str(e))
+        strings = generate(settings_from(args))
+    except JumbleError as e:
+        # The message is the whole output, with no usage line (§6).
+        print(f"jumble: error: {e}", file=sys.stderr)
+        return 2
+    for s in strings:
+        print(s)
     return 0
