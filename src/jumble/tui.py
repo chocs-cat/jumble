@@ -1,5 +1,8 @@
 """The interactive generator (docs/spec.md §7): controls beside results, live validation."""
 
+import contextlib
+import os
+import time
 from importlib.metadata import version
 from typing import ClassVar
 
@@ -55,6 +58,7 @@ class JumbleApp(App[None]):
         ("g", "jumble", "Jumble"),
         ("c", "copy", "Copy"),
         ("a", "copy_all", "Copy all"),
+        ("s", "save", "Save"),
         ("q", "quit", "Quit"),
         Binding("escape", "focus_results", show=False),
     ]
@@ -165,8 +169,8 @@ class JumbleApp(App[None]):
         pane.set_options(rows)
         pane.highlighted = 0
 
-    # Copying uses the last jumble's strings, valid controls or not; before
-    # any jumble there is nothing to copy (§7.1, §7.2).
+    # Copying and saving use the last jumble's strings, valid controls or
+    # not; before any jumble there is nothing to copy or save (§7.1, §7.2).
 
     def action_copy(self) -> None:
         index = self.query_one("#results", OptionList).highlighted
@@ -182,3 +186,31 @@ class JumbleApp(App[None]):
         self.copy_to_clipboard("\n".join(self.strings))
         n = len(self.strings)
         self.notify(f"Copied {n} string" if n == 1 else f"Copied {n} strings")
+
+    def action_save(self) -> None:
+        """Write every string to a new `jumble-<epoch>-<count>.txt` here (§7.3, DEC-13)."""
+        if not self.strings:
+            return
+        name = f"jumble-{int(time.time())}-{len(self.strings)}.txt"
+        # The same bytes as the command line's lines output (§4.1).
+        data = "".join(f"{s}\n" for s in self.strings).encode()
+        try:
+            # One exclusive create, so an existing file is never replaced (§7.3).
+            f = open(name, "xb")  # noqa: SIM115
+        except FileExistsError:
+            self.notify(f"{name} exists; nothing saved", severity="error")
+            return
+        except OSError as e:
+            self.notify(f"can't save {name}: {e.strerror}", severity="error")
+            return
+        try:
+            with f:
+                f.write(data)
+        except OSError as e:
+            # The exclusive create made this file, so removing it removes only
+            # the partial save (§7.3).
+            with contextlib.suppress(OSError):
+                os.remove(name)
+            self.notify(f"can't save {name}: {e.strerror}", severity="error")
+            return
+        self.notify(f"Saved {name}")

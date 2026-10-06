@@ -129,7 +129,7 @@ produce strings, a banner under the header says why, with the same message the
 command line would print, and the strength disappears until you fix them.
 Changing a control leaves the strings alone; only a jumble replaces them. The
 list shows the first 1000 strings and says how many more there are; copying all
-takes every one.
+and saving take every one.
 
 The keys are listed in the footer:
 
@@ -138,11 +138,18 @@ The keys are listed in the footer:
 | `g` | jumble a new batch with the current controls (not while the banner shows) |
 | `c` | copy the string under the cursor |
 | `a` | copy all strings, one per line |
+| `s` | save all strings to a new file, `jumble-<epoch>-<count>.txt`, in the current directory |
 | `q` | quit |
 
 Focus starts on the strings, so the keys work. In a text box, `enter`
 jumbles (as `g` does) and returns to the strings, and `escape` returns without
-jumbling. While the banner shows, `c` and `a` copy the last batch.
+jumbling. While the banner shows, `c`, `a`, and `s` use the last batch.
+
+`s` never overwrites: if the file exists (a second save in the same second),
+it saves nothing and says so. The file holds the same bytes as `jumble`'s
+output: UTF-8, one string per line.
+
+![The jumble TUI: controls on the left, ten strings on the right](docs/tui.svg)
 
 ## Development
 
