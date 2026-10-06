@@ -4,7 +4,7 @@
 - **Created:** 2026-10-06
 - **Ready:** 2026-10-06
 - **Completed:** —
-- **Decisions:** DEC-2 – DEC-14
+- **Decisions:** DEC-2 – DEC-16
 
 ## 1. Problem and outcome
 
@@ -101,9 +101,9 @@ repo.
 | `docs/spec.md` §2.2, §6 (at the cut of P0001-C01) | An empty `-s` name is an error and `custom` is not a set name; §6 numbers are plain integers; the CLI's validation error is one line with no usage | Questions the C01 executor would otherwise have decided. |
 | `docs/decisions.md` DEC-1 (at the review of P0001-C01) | Amended in place: draws are built on `secrets.randbelow`, not `secrets.choice` | It contradicted DEC-6 and spec §3. |
 | `docs/spec.md` §4, §4.1, §4.2, §4.3, §6 (at the cut of P0001-C02) | The `tui` misuse message; UTF-8 stdout whatever the locale and `-o -`; JSON key order, rounding, `charsets`/`custom` values, and formatting; the strength line's singular, decimals, and timing; `REASON` in the write error | Questions the C02 executor would otherwise have decided. |
-
 | `docs/spec.md` §4.1, §4.2, §6 and `docs/decisions.md` DEC-14 (at the review of P0001-C02) | Failed and closed-pipe writes to stdout; the §4.2 example in its real layout | The stdout branch of a write failure was unspecified and printed `can't write None`. |
 | `docs/spec.md` §7.1, §7.2 (at the cut of P0001-C03) | Header title and version source, the subtitle's exact text, unparsable number inputs, the results cursor and the unhighlightable `… more` row, the copy toasts, `enter` while invalid, keys before any result | Questions the C03 executor would otherwise have decided. |
+| `docs/spec.md` §7.1, §7.3, §7.5 and `docs/decisions.md` DEC-15, DEC-16 (at the review of P0001-C03 and the cut of P0001-C04) | A give-up in the TUI is an error toast; the save's name, bytes, toasts, and failures; `jumble … tui` rejects unknown set names and otherwise starts with the banner | The TUI's give-up crashed it, and the C04 executor would otherwise have decided the rest. |
 
 README.md is not changed by this planning work: it stays true to the shipped
 behavior, and each chunk updates it with the behavior it lands.
@@ -222,8 +222,9 @@ while the screen is open.
 | Chunk | Delivery items | State | Review | Integrated identity |
 |---|---|---|---|---|
 | P0001-C01 | D1 | accepted with follow-ups | 2026-10-06 | PR #7, `5453b64` |
-| P0001-C02 | D2 | accepted with follow-ups | 2026-10-06 | PR #9 |
-| P0001-C03 | D3 (layout, validation, copy keys) | ready for an executor | — | — |
+| P0001-C02 | D2 | accepted with follow-ups | 2026-10-06 | PR #9, `5efd848` |
+| P0001-C03 | D3 (layout, validation, copy keys) | accepted with follow-ups | 2026-10-06 | PR #10 |
+| P0001-C04 | D3 (give-up toast, starting values, `s`, screenshot) | ready for an executor | — | — |
 
 ## 8. Closeout
 

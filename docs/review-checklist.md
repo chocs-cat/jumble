@@ -39,3 +39,19 @@ sibling path once by hand.
 `can't write {args.output}`; `jumble -c 200000 | head -1` printed
 `jumble: error: can't write None: Broken pipe`. Spec §6 had named only the
 file case (`brief-checklist §2`).
+
+### §2. A call that passed validation can still raise
+
+**Shape:** a function validates up front but has a failure only drawing can
+reveal (a retry cap, a race, a resource running out). One caller handles its
+exception; another trusts the earlier validation and calls it bare, so the
+late failure escapes as a crash.
+
+**Check:** for each function in the diff that raises after its own checks,
+list every caller (`search_graph`, or grep the name) and confirm each one
+catches the late error and does what the spec says with it.
+
+**Provenance:** P0001-C03. `cli.main` caught `JumbleError` from `generate`;
+`JumbleApp.action_jumble` called it only after `strength` had validated, so
+`unique`'s give-up (§3.4) would quit the TUI with a traceback. Spec §7.1 had
+said nothing about it (`brief-checklist §2`); DEC-15 pinned it at the review.

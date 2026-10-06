@@ -47,7 +47,9 @@ With no `-s` and no `--custom`, jumble draws from `lower`, `upper`, and
 first set of the table below, with `--custom` last; a choice left with no
 characters of its own is an error. Each character is one Unicode code point,
 so `--custom` rejects control and combining characters. Errors print
-`jumble: error: …` and exit 2; a file `-o` can't write exits 1.
+`jumble: error: …` and exit 2; a failed write, to an `-o` file or to stdout,
+exits 1. When a pipe's reader stops early (`jumble -c 100000 | head -1`),
+jumble exits 1 without a message.
 
 jumble generates every string before writing any, so a failed run prints
 nothing and leaves an existing `-o` file as it was. Output is UTF-8, on stdout
@@ -110,7 +112,32 @@ with `tui`.
 | `currency` | `¢£¥€₹₽₩₪₺₿₫₱` | 12 |
 | `box` | box drawing and block elements ─…▟ | 160 |
 
-In the TUI, `g` jumbles again, `c` copies the result, and `q` quits.
+### The TUI
+
+`jumble tui` opens the generator in the terminal. On the left are the
+controls: length and count, every character set in the table above to check
+or uncheck, custom characters, and the four options (No look-alikes, One from
+each set, No repeats, All unique). On the right are the strings, one per row.
+The header shows the alphabet size and strength for the controls as they
+stand, updated as you change them. When the controls can't produce strings, a
+banner under the header says why, with the same message the command line
+would print, and the strength disappears until you fix them. Changing a
+control leaves the strings alone; only a jumble replaces them. The list shows
+the first 1000 strings and says how many more there are; copying all takes
+every one.
+
+The keys are listed in the footer:
+
+| Key | Action |
+|---|---|
+| `g` | jumble a new batch with the current controls (not while the banner shows) |
+| `c` | copy the string under the cursor |
+| `a` | copy all strings, one per line |
+| `q` | quit |
+
+Focus starts on the strings, so the keys work. In a text box, `enter`
+jumbles (as `g` does) and returns to the strings, and `escape` returns without
+jumbling. While the banner shows, `c` and `a` copy the last batch.
 
 ## Development
 

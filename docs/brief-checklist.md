@@ -62,3 +62,21 @@ put it in *Out of scope* by name.
 REASON` for `-o FILE`; nothing covered a failed write to stdout, which then
 printed `can't write None: Broken pipe` (`review-checklist §1`). DEC-14
 pinned it at the review.
+
+### §3. A test meant to catch a trap passes without the fix
+
+**Shape:** the brief names a trap (a buffered flush, a race, an off-by-one at
+a boundary) and prescribes the test that proves it is handled, but the
+prescribed inputs never reach the trap, so the test passes with the fix
+removed. It reads as coverage and guards nothing.
+
+**Check:** for each *Tests* line written against a named trap, walk the
+inputs through the failing path by hand, or try them against the unfixed
+code, and confirm they would fail it. Name the mutation the test must catch
+in the line itself.
+
+**Provenance:** P0001-C03. Unit a's kickoff note said a closed pipe leaves
+`Exception ignored … BrokenPipeError` at exit when stdout still holds bytes;
+its prescribed test, `-c 200000`, overflows the buffer, so nothing stays
+buffered and the test passes without `quiet_stdout()`. The executor added a
+pipe closed before writing, which fails without it.
