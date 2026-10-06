@@ -3,11 +3,13 @@
 The behavior is defined in docs/spec.md; section numbers below refer to it.
 """
 
+import math
 import secrets
 import string
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import NamedTuple
 
 
 def _span(first: int, last: int, *, without: Iterable[int] = ()) -> str:
@@ -117,6 +119,59 @@ def chosen_sets(settings: Settings) -> list[tuple[str, str]]:
         seen.update(kept)
         result.append((name, kept))
     return result
+
+
+class Strength(NamedTuple):
+    """Alphabet size and strength of a settings value (§3.5)."""
+
+    alphabet_size: int
+    bits: float
+    """log₂ of the number of possible strings, unrounded."""
+    is_bound: bool
+    """True when `each` is on: the bits are then an upper bound (DEC-7)."""
+
+
+def _possible(size: int, settings: Settings) -> int:
+    """The number of possible strings, P (§3.5); ignores `each` (DEC-7)."""
+    if settings.no_repeat:
+        return math.perm(size, settings.length)
+    return size**settings.length
+
+
+def validate(settings: Settings) -> list[tuple[str, str]]:
+    """Run every §6 check before drawing, in the table's order; the first failure wins.
+
+    Returns the chosen sets, as `chosen_sets` does.
+    """
+    if settings.length < 1:
+        raise JumbleError("length must be at least 1")
+    if settings.count < 1:
+        raise JumbleError("count must be at least 1")
+    sets = chosen_sets(settings)
+    k = len(sets)
+    size = sum(len(chars) for _, chars in sets)
+    if settings.each and settings.length < k:
+        raise JumbleError(
+            f"length must be at least {k} to take one character from each of {k} sets"
+        )
+    if settings.no_repeat and settings.length > size:
+        raise JumbleError(f"length can't be more than {size} without repeats")
+    if settings.unique:
+        possible = _possible(size, settings)
+        if settings.count > possible:
+            raise JumbleError(f"only {possible} different strings are possible")
+    return sets
+
+
+def strength(settings: Settings) -> Strength:
+    """Alphabet size, bits per string, and whether that is a bound (§3.5).
+
+    Validates first, so the alphabet is the one `generate` would use.
+    """
+    size = sum(len(chars) for _, chars in validate(settings))
+    # log₂ of the exact integer, so a long string can't overflow a float power.
+    bits = math.log2(_possible(size, settings))
+    return Strength(size, bits, settings.each)
 
 
 def alphabet(charsets: Iterable[str], *, exclude_ambiguous: bool = False) -> str:
