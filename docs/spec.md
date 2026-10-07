@@ -271,8 +271,9 @@ through the link (DEC-10).
 A save takes these steps, in order (DEC-18):
 
 1. Read the file at the §5.1 path. A missing file, or one that is not UTF-8
-   or not valid TOML, is replaced: the save starts from the template below.
-   A file that exists but can't be read fails the save (§7.4).
+   or not valid TOML as §5.1 reads it, is replaced: the save starts from the
+   template below (DEC-19). A file that exists but can't be read fails the
+   save (§7.4).
 2. Remove every top-level key that is not a setting name of §1, with its
    value.
 3. For each setting of §1, in §1's order: if the file has the key and its

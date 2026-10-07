@@ -1,6 +1,6 @@
-"""The settings file (docs/spec.md §5).
+"""The settings file (docs/spec.md §5): reading it, and saving over it.
 
-Reading only; section numbers below refer to the spec.
+Section numbers below refer to the spec.
 """
 
 import os
@@ -8,7 +8,10 @@ import tomllib
 from dataclasses import fields
 from pathlib import Path
 
-from jumble.generate import JumbleError, Settings, check_value
+import tomlkit
+from tomlkit.exceptions import TOMLKitError
+
+from jumble.generate import JumbleError, Settings, check_value, settings_dict
 
 # §1's setting names, in §1's order.
 NAMES: tuple[str, ...] = tuple(f.name for f in fields(Settings))
@@ -76,3 +79,82 @@ def load(path: Path) -> dict[str, object]:
         except JumbleError as e:
             raise JumbleError(f"{path}: {key}: {e}") from e
     return table
+
+
+# A new file starts from this, with the saved values in place of these
+# defaults (§5.3); a test holds it to the spec's copy.
+TEMPLATE = """\
+# jumble settings. Every key is optional; options given on the command
+# line override them. See `jumble --help` for the character sets.
+
+# Characters per string, at least 1.
+length = 16
+# How many strings, at least 1.
+count = 1
+# The named sets to draw from.
+charsets = ["lower", "upper", "digits"]
+# Extra characters, drawn as one more set.
+custom = ""
+# Leave out look-alike characters such as 0 O l 1 I.
+no_ambiguous = false
+# At least one character from every chosen set.
+each = false
+# No character twice within a string.
+no_repeat = false
+# No string twice in the output.
+unique = false
+"""
+
+
+def _document(path: Path) -> tomlkit.TOMLDocument:
+    """The file at `path` to save over, or the template in its place (§5.3 step 1).
+
+    A missing file, or one that is not UTF-8 or not valid TOML, is replaced
+    by the template; a file that exists but can't be read raises `JumbleError`.
+    """
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return tomlkit.parse(TEMPLATE)
+    except OSError as e:
+        raise JumbleError(f"can't save {path}: {e.strerror}") from e
+    try:
+        text = data.decode("utf-8")
+        # Valid TOML is what `load` reads: tomlkit also parses TOML 1.1, which
+        # tomllib rejects, and a line kept from such a file would still break
+        # the command line (DEC-19).
+        tomllib.loads(text)
+        return tomlkit.parse(text)
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError, TOMLKitError):
+        return tomlkit.parse(TEMPLATE)
+
+
+def save(path: Path, settings: Settings) -> None:
+    """Write `settings` to the settings file at `path`, keeping what it can (§5.3, DEC-18).
+
+    Unknown keys are removed; a key whose value already equals the saved one,
+    in TOML type and value, is left as it is, comments and all; any other is
+    replaced on its own line, and a missing one is appended. The write is in
+    place, through a symlink, after creating missing parent directories. A
+    file that can't be read or written raises `JumbleError` with
+    `can't save PATH: REASON` (§7.4). Pass settings that have passed
+    `validate`.
+    """
+    doc = _document(path)
+    for key in [key for key in doc if key not in NAMES]:
+        del doc[key]
+    for key, value in settings_dict(settings).items():
+        if key in doc:
+            old = doc.item(key).unwrap()
+            # Same type, then same value: `True == 1` and `16.0 == 16` would
+            # otherwise leave `length = true` and `length = 16.0` in place.
+            if type(old) is type(value) and old == value:
+                continue
+        # Replaces the value in place, keeping the line's comment, or appends
+        # `KEY = VALUE` at the end.
+        doc[key] = value
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(tomlkit.dumps(doc).encode("utf-8"))
+    except OSError as e:
+        raise JumbleError(f"can't save {path}: {e.strerror}") from e

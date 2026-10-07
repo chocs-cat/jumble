@@ -236,3 +236,16 @@ would then reject. Paths in messages are `pathlib`'s rendering, normalizing
 the settings screen all show one form. Added at the review of P0001-C05.
 
 *Where:* docs/spec.md §5.1, §5.3, §7.4.
+
+## DEC-19: A save judges a file's TOML as reading does (2026-10)
+
+A save (spec §5.3 step 1) keeps a file only when it is valid TOML to the
+reader, `tomllib`, which §5.1 and §6 use; only then does tomlkit edit it.
+tomlkit parses TOML 1.1, which the `tomllib` of Python 3.13 (TOML 1.0)
+rejects: a file holding `custom = "\x41"` is `custom = "A"` to tomlkit, so a
+save of `custom = "A"` would keep that line as equal and write a file the
+command line refuses. Trusting tomlkit's parse alone was the alternative; a
+save would then report success over a file that still breaks every run.
+Added during P0001-C06-a.
+
+*Where:* docs/spec.md §5.3.
