@@ -237,8 +237,12 @@ effective settings (§5.2), as for the command line alone. A file error stops
 the command line even when the command line overrides that key; the TUI
 starts without the file instead (§7.4).
 
-The messages are in §6. `PATH` in them is the path as jumble resolved it:
-`$JUMBLE_CONFIG` as given, or the XDG or home path in full, `~` expanded.
+The messages are in §6. `PATH` in them is the path as jumble resolved it,
+written as Python's `pathlib` writes a path: `$JUMBLE_CONFIG` as given, a
+relative path staying relative, except that `pathlib` drops a leading `./`
+and doubled or trailing slashes (`./cfg.toml` is `cfg.toml`); or the XDG or
+home path in full, `~` expanded. The TUI's toasts and settings screen show
+the path the same way (§7.4).
 
 ### 5.2 Precedence
 
@@ -263,6 +267,52 @@ values that differ, and keeps the file's comments and layout; a save with
 nothing changed leaves the file byte for byte as it was. A new file starts
 from a commented template listing every key. A symlinked file is written
 through the link (DEC-10).
+
+A save takes these steps, in order (DEC-18):
+
+1. Read the file at the §5.1 path. A missing file, or one that is not UTF-8
+   or not valid TOML, is replaced: the save starts from the template below.
+   A file that exists but can't be read fails the save (§7.4).
+2. Remove every top-level key that is not a setting name of §1, with its
+   value.
+3. For each setting of §1, in §1's order: if the file has the key and its
+   value equals the saved value (same TOML type and value), leave that line
+   untouched, comments and formatting included; if it has the key with
+   another value or type, replace the value in place, keeping the line's
+   comment; if it lacks the key, append `KEY = VALUE` at the end of the file.
+4. Write the result as UTF-8 to the path, following a symlink to its target,
+   creating the file's missing parent directories first. The write is in
+   place, not by renaming a temporary file, so a link and the file's
+   permissions stay as they were.
+
+Values are written as tomlkit writes them: integers in decimal, `charsets` as
+a one-line array of the chosen names in canonical order (an empty array when
+only `custom` chooses characters), `custom` as a basic string, and booleans
+as `true` or `false`.
+
+The template, with the saved values in place of these defaults:
+
+```toml
+# jumble settings. Every key is optional; options given on the command
+# line override them. See `jumble --help` for the character sets.
+
+# Characters per string, at least 1.
+length = 16
+# How many strings, at least 1.
+count = 1
+# The named sets to draw from.
+charsets = ["lower", "upper", "digits"]
+# Extra characters, drawn as one more set.
+custom = ""
+# Leave out look-alike characters such as 0 O l 1 I.
+no_ambiguous = false
+# At least one character from every chosen set.
+each = false
+# No character twice within a string.
+no_repeat = false
+# No string twice in the output.
+unique = false
+```
 
 ## 6. Errors
 
@@ -389,12 +439,20 @@ no race can replace a file. Any other failed write is the error toast
 
 Two routes write the settings file (§5.3) and confirm its path in a toast:
 
-- `d` saves the main screen's current controls as they stand.
+- `d` saves the main screen's current controls as they stand. While they are
+  invalid (§7.1) it writes nothing and shows the banner's §6 message in an
+  error toast, so a save never writes a file the command line would refuse.
 - `,` opens a settings screen: a form with every setting of §1, filled from
   the settings file (or the built-in defaults), the file's path, and Save and
   Cancel. Save validates (§6), writes the file, closes the screen, and sets the
   main screen's controls to the saved values; Cancel and `escape` close it
   without change. Main-screen keys don't act while it is open.
+
+Either route writes to the §5.1 path as it resolves at the time of the save,
+even when the TUI was started with `--no-config`. A successful save's toast
+is `Saved defaults to PATH`. A save that fails (the file exists but can't be
+read, or the write fails) shows the error toast `can't save PATH: REASON`,
+with `REASON` as in §6. `PATH` is written as in §5.1 (DEC-18).
 
 When the settings file is invalid, the TUI starts from the built-in defaults
 and the command line's options, as if `--no-config` were given, and shows the

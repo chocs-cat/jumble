@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from jumble.cli import main, parser, settings_from
-from jumble.generate import AMBIGUOUS, CHARSETS, Settings, validate
+from jumble.generate import AMBIGUOUS, CHARSETS, Settings, settings_dict, validate
 
 
 def run(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, list[str], str]:
@@ -20,7 +20,7 @@ def run(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, list[
 
 
 def settings(*argv: str) -> Settings:
-    return settings_from(parser().parse_args(argv))
+    return settings_from(parser().parse_args(argv), {})
 
 
 def test_prints_count_strings(capsys: pytest.CaptureFixture[str]) -> None:
@@ -416,3 +416,196 @@ def test_tui_help_says_options_set_its_start(capsys: pytest.CaptureFixture[str])
         main(["--help"])
     out = " ".join(capsys.readouterr().out.split())
     assert "starting from the options before tui" in out
+
+
+# The settings file (§5): `config_file` is $JUMBLE_CONFIG, missing until written.
+
+
+def test_file_reaches_the_settings(config_file: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_file.write_text(
+        'length = 6\ncount = 3\ncharsets = ["digits", "lower"]\ncustom = "XY"\n'
+        "no_ambiguous = true\neach = true\nno_repeat = true\nunique = true\n"
+    )
+    obj = run_json([], capsys)
+    assert obj["settings"] == {
+        "length": 6,
+        "count": 3,
+        "charsets": ["lower", "digits"],
+        "custom": "XY",
+        "no_ambiguous": True,
+        "each": True,
+        "no_repeat": True,
+        "unique": True,
+    }
+    assert len(obj["strings"]) == 3
+
+
+def test_an_option_at_its_default_beats_the_file(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 32\ncount = 4\n")
+    settings = run_json(["-n", "16", "-c", "1"], capsys)["settings"]
+    assert (settings["length"], settings["count"]) == (16, 1)
+
+
+def test_file_keys_the_command_line_leaves_alone_stay(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 32\neach = true\n")
+    settings = run_json(["-c", "2", "-u"], capsys)["settings"]
+    assert (settings["length"], settings["count"]) == (32, 2)
+    assert (settings["each"], settings["unique"]) == (True, True)
+
+
+def test_charset_replaces_the_files_characters(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text('charsets = ["greek"]\ncustom = "XY"\n')
+    settings = run_json(["-s", "digits"], capsys)["settings"]
+    assert (settings["charsets"], settings["custom"]) == (["digits"], "")
+
+
+def test_empty_custom_replaces_the_files_characters(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text('charsets = ["greek"]\ncustom = "XY"\n')
+    settings = run_json(["--custom", ""], capsys)["settings"]
+    assert (settings["charsets"], settings["custom"]) == (["lower", "upper", "digits"], "")
+
+
+def test_file_custom_alone_is_the_only_characters(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text('custom = "abc"\n')
+    code, lines, _ = run(["-n", "50", "-c", "5"], capsys)
+    assert code == 0
+    assert all(set(line) <= set("abc") for line in lines)
+
+
+def test_file_with_no_characters_gets_the_defaults(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text('charsets = []\ncustom = ""\n')
+    assert run_json([], capsys)["settings"]["charsets"] == ["lower", "upper", "digits"]
+
+
+def test_file_each_with_a_short_command_line_length(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("each = true\n")
+    code, lines, err = run(["-n", "2", "-s", "lower,upper,digits"], capsys)
+    assert (code, lines) == (2, [])
+    assert err == (
+        "jumble: error: length must be at least 3 to take one character from each of 3 sets\n"
+    )
+
+
+def test_no_config_ignores_a_broken_file(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 0\n")
+    code = main(["--no-config", "--json"])
+    out, err = capsys.readouterr()
+    assert (code, err) == (0, "")
+    assert json.loads(out)["settings"] == settings_dict(Settings())
+
+
+@pytest.mark.parametrize("argv", [[], ["-n", "8"]])
+def test_a_file_error_stops_the_run(
+    argv: list[str], config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 0\n")
+    code = main(argv)
+    out, err = capsys.readouterr()
+    assert (code, out) == (2, "")
+    assert err == f"jumble: error: {config_file}: length: length must be at least 1\n"
+
+
+def test_a_file_error_writes_no_output_file(
+    config_file: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("colour = 1\n")
+    out = tmp_path / "out.txt"
+    out.write_text("keep\n")
+    assert main(["-o", str(out)]) == 2
+    assert out.read_text() == "keep\n"
+
+
+def test_an_unreadable_file(config_file: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_file.mkdir()
+    code = main([])
+    out, err = capsys.readouterr()
+    assert (code, out) == (2, "")
+    assert err == f"jumble: error: can't read {config_file}: Is a directory\n"
+
+
+def test_the_installed_command_reads_the_file(config_file: Path) -> None:
+    # The fixture's $JUMBLE_CONFIG reaches subprocesses too.
+    config_file.write_text("length = 0\n")
+    proc = subprocess.run(
+        [sys.executable, "-m", "jumble"], capture_output=True, text=True, check=False
+    )
+    assert (proc.returncode, proc.stdout) == (2, "")
+    assert proc.stderr == f"jumble: error: {config_file}: length: length must be at least 1\n"
+
+
+def test_help_names_no_config(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    assert "--no-config" in capsys.readouterr().out
+
+
+# The TUI starts from the settings file too (§7.4, §7.5).
+
+
+@pytest.mark.parametrize(
+    ("argv", "length"),
+    [(["tui"], 32), (["-n", "8", "tui"], 8), (["--no-config", "tui"], 16)],
+)
+def test_tui_starts_from_the_file(
+    argv: list[str], length: int, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file.write_text("length = 32\n")
+    launched = Launched(monkeypatch)
+    assert main(argv) == 0
+    assert [(app.initial.length, app.file_error) for app in launched.apps] == [(length, None)]
+
+
+def test_a_file_error_starts_the_tui_without_the_file(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("count = 5\nlength = 0\n")
+    launched = Launched(monkeypatch)
+    assert main(["-n", "8", "tui"]) == 0
+    assert capsys.readouterr() == ("", "")
+    [app] = launched.apps
+    assert app.initial == Settings(length=8)
+    assert app.file_error == f"{config_file}: length: length must be at least 1"
+
+
+def test_an_unknown_set_still_stops_the_tui_with_a_broken_file(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("length = 0\n")
+    launched = Launched(monkeypatch)
+    code, _, err = run(["-s", "foo", "tui"], capsys)
+    assert (code, err) == (2, "jumble: error: unknown character set: 'foo'\n")
+    assert launched.apps == []
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        ("colour = 1", "colour: unknown setting"),
+        ("length = true", "length: must be an integer"),
+        ('charsets = ["foo"]', "charsets: unknown character set: 'foo'"),
+    ],
+)
+def test_file_errors_name_the_file_and_key(
+    line: str, message: str, config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text(line + "\n")
+    code = main(["-s", "digits"])
+    out, err = capsys.readouterr()
+    assert (code, out) == (2, "")
+    assert err == f"jumble: error: {config_file}: {message}\n"

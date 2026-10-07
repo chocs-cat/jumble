@@ -90,8 +90,10 @@ Releases are automated with release-please, from Conventional Commits.
 - A focused `Input` swallows printable keys, even over priority bindings, so
   the TUI starts focus on the results pane (DEC-12). Tests that press letter
   keys must not leave an input focused.
-- Tests never touch the real settings file: point `$JUMBLE_CONFIG` at a
-  `tmp_path` file (monkeypatch) in any test that loads or saves settings.
+- Tests never touch the real settings file: an autouse fixture in
+  `tests/conftest.py` (`config_file`) points `$JUMBLE_CONFIG` at a missing
+  file under `tmp_path` for every test, subprocesses included. A test that
+  needs a settings file takes `config_file` and writes it there.
 - Judge the gate by its exit code: don't pipe `make check` into `tail` or
   `head`, which hides a failure. After a hand mutation check, clear
   `__pycache__` (or set `PYTHONDONTWRITEBYTECODE=1`) before the next run:

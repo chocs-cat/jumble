@@ -92,13 +92,12 @@ def settings_dict(settings: Settings) -> dict[str, object]:
     return values
 
 
-def _custom_chars(custom: str) -> str:
-    """`custom` with repeats removed, each kept at its first position (§2.3)."""
+def _check_custom(custom: str) -> None:
+    """Raise §6's message if `custom` has a control or combining character (§2.3, DEC-4)."""
     for c in custom:
         category = unicodedata.category(c)
         if category in _FORBIDDEN_CATEGORIES or category.startswith("M"):
             raise JumbleError("custom characters can't include control or combining characters")
-    return "".join(dict.fromkeys(custom))
 
 
 def check_names(charsets: Iterable[str]) -> None:
@@ -111,6 +110,27 @@ def check_names(charsets: Iterable[str]) -> None:
             raise JumbleError(f"unknown character set: '{name}'")
 
 
+def check_value(name: str, value: object) -> None:
+    """Raise §6's message if one setting's `value` breaks that setting's own rule (§5.1).
+
+    The rules that judge one value alone: `length` and `count` at least 1,
+    every `charsets` name known, and `custom` with no control or combining
+    character. The other settings have none. `value` must already have the
+    setting's type (§1). `validate` and `chosen_sets` run their checks of
+    these rules through here, and so does the settings file (DEC-17).
+    """
+    if name in ("length", "count"):
+        assert isinstance(value, int)
+        if value < 1:
+            raise JumbleError(f"{name} must be at least 1")
+    elif name == "charsets":
+        assert isinstance(value, Iterable)
+        check_names(value)
+    elif name == "custom":
+        assert isinstance(value, str)
+        _check_custom(value)
+
+
 def chosen_sets(settings: Settings) -> list[tuple[str, str]]:
     """The chosen sets after §2.4 steps 1–3, as `(name, characters)` pairs.
 
@@ -118,8 +138,10 @@ def chosen_sets(settings: Settings) -> list[tuple[str, str]]:
     Runs the §6 checks from "unknown set name" to "a chosen set is empty", in
     that order.
     """
-    check_names(settings.charsets)
-    custom = _custom_chars(settings.custom)
+    check_value("charsets", settings.charsets)
+    check_value("custom", settings.custom)
+    # Repeats count once, each kept at its first position (§2.3).
+    custom = "".join(dict.fromkeys(settings.custom))
     if not settings.charsets and not custom:
         raise JumbleError("choose at least one character set")
 
@@ -177,10 +199,8 @@ def validate(settings: Settings) -> list[tuple[str, str]]:
 
     Returns the chosen sets, as `chosen_sets` does.
     """
-    if settings.length < 1:
-        raise JumbleError("length must be at least 1")
-    if settings.count < 1:
-        raise JumbleError("count must be at least 1")
+    check_value("length", settings.length)
+    check_value("count", settings.count)
     sets = chosen_sets(settings)
     k = len(sets)
     size = sum(len(chars) for _, chars in sets)
