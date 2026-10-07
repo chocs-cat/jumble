@@ -270,3 +270,22 @@ nothing reaches the main screen except through Save. Added at the cut of
 P0001-C07.
 
 *Where:* docs/spec.md §7.4.
+
+## DEC-21: Bare `jumble` in a terminal opens the TUI (2026-10)
+
+`jumble` typed alone at a prompt opens the TUI, because that is what a
+person at a terminal with nothing more to say most likely wants; any
+argument means the command line, which prints. The TUI opens only when
+standard input and standard output are both terminals: the TUI needs both,
+and `jumble | pbcopy`, `$(jumble)`, and scripts keep getting one printed
+string, as they did. Ruled out: opening the TUI for any invocation without
+output options (every printing use at a prompt would then need a flag),
+opening it whenever stdout is a terminal (`echo | jumble` would start a TUI
+with no keyboard), an error when piped (it would break the oldest use), and
+a `--print` flag (any option already prints, `jumble -c 1` included).
+`jumble tui` stays, as the way to open the TUI with starting options. Bare
+`jumble` in a terminal used to print, so the change is marked breaking.
+Added at the cut of P0001-C08, from issue #20.
+
+*Where:* docs/spec.md §4, §7.
+

@@ -4,7 +4,7 @@
 - **Created:** 2026-10-06
 - **Ready:** 2026-10-06
 - **Completed:** —
-- **Decisions:** DEC-2 – DEC-20
+- **Decisions:** DEC-2 – DEC-21
 
 ## 1. Problem and outcome
 
@@ -56,7 +56,9 @@ more characters (DEC-3), so the same command can produce strings it couldn't
 before; the chunk that lands them is titled `feat!`. Existing flags (`-n`,
 `-c`, `-s`, `-a`, `tui`) keep their meaning. `jumble.generate(length,
 charsets, exclude_ambiguous=…)` may change shape; it has no users outside this
-repo.
+repo. Bare `jumble` in a terminal opens the TUI instead of printing (DEC-21,
+added as D6 after D5); piped, it still prints, and the chunk is titled
+`feat(cli)!`.
 
 ## 3. Design questions
 
@@ -87,6 +89,7 @@ repo.
 | How many strings does the TUI show? | first 1000; copy all and save use all | spec §7.1, DEC-11 | resolved |
 | Save defaults from the main screen, a settings screen, or both? | both: `d` and `,` | spec §7.4 | resolved |
 | What does the TUI start from? | effective settings, including options before `tui` | spec §7.5 | resolved |
+| What does bare `jumble` do? (#20, after D5) | in a terminal (stdin and stdout), the TUI; otherwise it prints; any argument prints; `tui` stays | spec §4, §7, DEC-21 | resolved |
 | Where does code live? | `generate.py` owns sets, settings type, validation, generation, strength; `config.py` owns the file | AGENTS.md Conventions, DEC-10 | resolved |
 
 ## 4. Authority changes
@@ -109,6 +112,7 @@ repo.
 | `docs/spec.md` §5.3 and `docs/decisions.md` DEC-19 (during P0001-C06-a) | A save keeps a file only when `tomllib` reads it | The brief named tomlkit's parse error as the test, and tomlkit reads TOML 1.1 (`brief-checklist §5`). |
 | `docs/spec.md` §7.1, §7.4 and `docs/decisions.md` DEC-20 (at the cut of P0001-C07) | Whole labels at 100 × 30 (#12); the settings screen's starting values, file errors, path, Save (button or `enter`), its validation and failures, and its effect on the main screen | Questions the C07 executor would otherwise have decided. |
 | `docs/spec.md` §7.4 (at the review of P0001-C07) | The settings screen's focus starts on its Length input; `escape` is its only key | The brief's note assumed Textual focuses a pushed screen's first control; it inherits the App's `#results` instead. |
+| `docs/spec.md` §4, §7 and `docs/decisions.md` DEC-21 (after the review of P0001-C07, the cut of P0001-C08) | Bare `jumble` in a terminal opens the TUI; when either stream isn't a terminal, or with any argument, it prints | The user asked for it (#20); no doc had recorded it. |
 
 README.md is not changed by this planning work: it stays true to the shipped
 behavior, and each chunk updates it with the behavior it lands.
@@ -211,6 +215,21 @@ invalid value with its §6 message, saves, closes, and updates the main
 controls; Cancel and `escape` change nothing; main-screen keys do nothing
 while the screen is open.
 
+### D6 — bare `jumble` opens the TUI
+
+**Build:** in `cli.main`, no arguments with stdin and stdout both
+terminals takes the `jumble tui` route (spec §4, §7, DEC-21); otherwise
+nothing changes. README's usage, `jumble --help`, and the TUI section say
+so. The pull request is titled `feat(cli)!` and closes #20.
+
+**Depends on:** D5. Added after D5's acceptance, at the user's request.
+
+**Done when:** tests show bare `jumble` opens the TUI, from the same
+settings as `jumble tui`, only when both streams are terminals, and prints
+one string in each other combination; any argument prints; the help and
+README describe it; a real-terminal run of bare `jumble` is in the chunk's
+report.
+
 ## 6. Project completion
 
 - A parity check against `strings_aupif.py`, recorded in Closeout: each of its
@@ -232,7 +251,8 @@ while the screen is open.
 | P0001-C04 | D3 (give-up toast, starting values, `s`, screenshot) | accepted | 2026-10-07 | PR #11, `11d323c` |
 | P0001-C05 | D4 | accepted | 2026-10-07 | PR #13, `417588b` |
 | P0001-C06 | D5 (`config.save`, `d`) | accepted | 2026-10-07 | PR #15, `e688e0b` |
-| P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | accepted with follow-ups | 2026-10-07 | PR #17 |
+| P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | accepted with follow-ups | 2026-10-07 | PR #17, `120d1c2` |
+| P0001-C08 | D6 (#20) | ready for an executor | — | — |
 
 ## 8. Closeout
 
