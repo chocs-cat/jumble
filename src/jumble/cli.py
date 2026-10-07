@@ -28,7 +28,13 @@ BOOLEANS = ("no_ambiguous", "each", "no_repeat", "unique")
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="jumble", description="Generate random strings.")
+    p = argparse.ArgumentParser(
+        prog="jumble",
+        # Bare jumble's two routes (§4, DEC-21).
+        description="Generate random strings. jumble alone, typed in a terminal, opens the "
+        "interactive generator, as jumble tui does; piped, in a script, or with any option, "
+        "it prints.",
+    )
     # -n, -c, and --custom default to None, so an option given at its default
     # value still overrides the settings file (§5.2).
     p.add_argument(
@@ -136,6 +142,12 @@ def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings
 
 def main(argv: Sequence[str] | None = None) -> int:
     p = parser()
+    if argv is None:
+        argv = sys.argv[1:]
+    # Bare jumble at a prompt is jumble tui; piped or scripted, it prints (§4, DEC-21).
+    # The TUI needs both streams, so a terminal on stdout alone isn't enough.
+    if not argv and is_terminal(sys.stdin) and is_terminal(sys.stdout):
+        argv = ["tui"]
     args = p.parse_args(argv)
     if args.command == "tui":
         # Before the TUI starts or any file is touched; -o - counts as given (§4, §6).
@@ -198,6 +210,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         # After the output, and only for a run that succeeded (§4.3).
         print(strength_line(st), file=sys.stderr)
     return 0
+
+
+def is_terminal(stream: Any) -> bool:
+    """Whether `stream` is a terminal; a closed standard stream (`None`) is not."""
+    return stream is not None and stream.isatty()
 
 
 def json_output(strings: list[str], settings: Settings, st: Strength) -> str:

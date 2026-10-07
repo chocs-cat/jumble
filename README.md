@@ -18,14 +18,16 @@ uv tool install .
 ## Usage
 
 ```sh
-jumble                          # one 16-character string of letters and digits
+jumble                          # in a terminal, open the TUI (below)
+jumble -c 1                     # one 16-character string of letters and digits
+jumble | pbcopy                 # the same, piped: bare jumble prints when piped
 jumble -n 32 -c 5               # five 32-character strings
 jumble -s lower,digits -a       # lowercase and digits, without look-alikes
 jumble -s lower -s symbols -e   # at least one lowercase letter and one symbol
 jumble --custom 'ACGT' -n 40    # only the characters you give
 jumble -s emoji-animals -n 4 -r # four different animals
 jumble -s digits -n 4 -c 20 -u  # twenty different four-digit codes
-jumble tui                      # pick the length and character sets interactively
+jumble tui                      # open the TUI, as bare jumble does in a terminal
 jumble -n 32 -s digits tui      # the same, starting from 32 digits
 ```
 
@@ -168,7 +170,10 @@ from the template.
 
 ### The TUI
 
-`jumble tui` opens the generator in the terminal. It starts from the settings
+`jumble` typed alone in a terminal opens the generator there, and so does
+`jumble tui`. When its input or output isn't a terminal (`jumble | pbcopy`,
+`$(jumble)`, a script), bare `jumble` prints one string instead, and any
+option at all (`jumble -c 1`) prints too. The TUI starts from the settings
 file, like the command line, and options given before `tui` override it:
 `jumble -n 32 -s digits tui` opens on 32-digit strings. A broken settings file
 doesn't stop the TUI: it opens from the built-in defaults and those options,

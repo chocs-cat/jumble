@@ -632,3 +632,148 @@ def test_file_errors_name_the_file_and_key(
     out, err = capsys.readouterr()
     assert (code, out) == (2, "")
     assert err == f"jumble: error: {config_file}: {message}\n"
+
+
+# Bare `jumble` opens the TUI when stdin and stdout are both terminals (§4, DEC-21).
+
+
+class Tty:
+    """A stand-in for a standard stream that says whether it is a terminal.
+
+    Everything but `isatty` goes to the stream it wraps, so a wrapped stdout
+    is still what `capsys` captures.
+    """
+
+    def __init__(self, stream: Any, tty: bool) -> None:
+        self.stream, self.tty = stream, tty
+
+    def isatty(self) -> bool:
+        return self.tty
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.stream, name)
+
+
+def terminals(monkeypatch: pytest.MonkeyPatch, stdin: bool = True, stdout: bool = True) -> None:
+    monkeypatch.setattr(sys, "stdin", Tty(io.StringIO(""), stdin))
+    monkeypatch.setattr(sys, "stdout", Tty(sys.stdout, stdout))
+
+
+def test_the_fixture_keeps_stdin_off_the_terminal() -> None:
+    # So `main([])` prints in every other test, even under `pytest -s` (conftest.py).
+    assert not sys.stdin.isatty()
+
+
+@pytest.mark.parametrize(
+    ("stdin", "stdout"), [(True, True), (True, False), (False, True), (False, False)]
+)
+def test_bare_jumble_opens_the_tui_only_with_both_terminals(
+    stdin: bool, stdout: bool, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    launched = Launched(monkeypatch)
+    terminals(monkeypatch, stdin, stdout)
+    code, lines, err = run([], capsys)
+    assert (code, err) == (0, "")
+    if stdin and stdout:
+        # The TUI route: one app from the defaults, nothing printed.
+        assert lines == []
+        assert [app.initial for app in launched.apps] == [Settings()]
+    else:
+        # The print route: one default string, no app.
+        assert launched.apps == []
+        [line] = lines
+        assert len(line) == 16
+        assert set(line) <= set(CHARSETS["lower"] + CHARSETS["upper"] + CHARSETS["digits"])
+
+
+@pytest.mark.parametrize(
+    ("file", "error"),
+    [
+        ('length = 32\ncharsets = ["digits"]\neach = true\n', None),
+        ("count = 5\nlength = 0\n", "length: length must be at least 1"),
+    ],
+)
+def test_bare_jumble_starts_the_tui_as_jumble_tui_does(
+    file: str,
+    error: str | None,
+    config_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_file.write_text(file)
+    launched = Launched(monkeypatch)
+    terminals(monkeypatch)
+    assert main([]) == 0
+    assert main(["tui"]) == 0
+    assert capsys.readouterr() == ("", "")
+    bare, tui = launched.apps
+    assert (bare.initial, bare.file_error) == (tui.initial, tui.file_error)
+    if error is None:
+        assert bare.initial == Settings(length=32, charsets=("digits",), each=True)
+        assert bare.file_error is None
+    else:
+        assert bare.initial == Settings()
+        assert bare.file_error == f"{config_file}: {error}"
+
+
+@pytest.mark.parametrize("argv", [["--no-config"], ["-c", "1"], ["-n", "16"]])
+def test_any_argument_prints_in_a_terminal(
+    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    launched = Launched(monkeypatch)
+    terminals(monkeypatch)
+    code, lines, err = run(argv, capsys)
+    assert (code, err) == (0, "")
+    assert launched.apps == []
+    [line] = lines
+    assert len(line) == 16
+
+
+@pytest.mark.parametrize(("argv", "opens"), [(["jumble"], True), (["jumble", "-c", "1"], False)])
+def test_main_without_argv_decides_on_sys_argv(
+    argv: list[str],
+    opens: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    launched = Launched(monkeypatch)
+    terminals(monkeypatch)
+    monkeypatch.setattr(sys, "argv", argv)
+    assert main(None) == 0
+    lines = capsys.readouterr().out.splitlines()
+    if opens:
+        assert (len(launched.apps), lines) == (1, [])
+    else:
+        assert launched.apps == []
+        assert [len(line) for line in lines] == [16]
+
+
+def test_a_closed_stdin_is_not_a_terminal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # `jumble <&-` leaves sys.stdin None: it prints, rather than crashing.
+    launched = Launched(monkeypatch)
+    monkeypatch.setattr(sys, "stdin", None)
+    monkeypatch.setattr(sys, "stdout", Tty(sys.stdout, True))
+    code, lines, err = run([], capsys)
+    assert (code, err, launched.apps) == (0, "", [])
+    assert [len(line) for line in lines] == [16]
+
+
+def test_bare_jumble_through_pipes_prints() -> None:
+    proc = subprocess.run(
+        [sys.executable, "-m", "jumble"], input="", capture_output=True, text=True, timeout=30
+    )
+    assert (proc.returncode, proc.stderr) == (0, "")
+    [line] = proc.stdout.splitlines()
+    assert len(line) == 16
+
+
+def test_help_says_bare_jumble_opens_the_tui(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    out = " ".join(capsys.readouterr().out.split())
+    assert (
+        "jumble alone, typed in a terminal, opens the interactive generator, as jumble tui "
+        "does; piped, in a script, or with any option, it prints." in out
+    )
