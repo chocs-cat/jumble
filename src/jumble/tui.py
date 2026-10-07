@@ -4,15 +4,28 @@ import contextlib
 import os
 import time
 from importlib.metadata import version
+from pathlib import Path
 from typing import ClassVar
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Grid, Horizontal, VerticalScroll
-from textual.widgets import Checkbox, Footer, Header, Input, OptionList, SelectionList, Static
+from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
+from textual.dom import DOMNode
+from textual.screen import ModalScreen
+from textual.widget import Widget
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Footer,
+    Header,
+    Input,
+    OptionList,
+    SelectionList,
+    Static,
+)
 from textual.widgets.option_list import Option
 
-from jumble.config import config_path, save
+from jumble.config import config_path, file_settings, load, save
 from jumble.generate import CHARSETS, JumbleError, Settings, generate, strength, strength_line
 
 DEFAULTS = Settings()
@@ -29,10 +42,6 @@ OPTIONS = (
 )
 
 
-# Each input and the set list are labelled in their border.
-TITLES = (("#length", "Length"), ("#count", "Count"), ("#charsets", "Sets"), ("#custom", "Custom"))
-
-
 def parse_int(value: str) -> int:
     """An integer input's value; one that doesn't parse (empty, `-`) counts as 0 (§7.1)."""
     try:
@@ -41,13 +50,155 @@ def parse_int(value: str) -> int:
         return 0
 
 
+def titled(widget: Widget, title: str) -> Widget:
+    """`widget`, labelled in its border."""
+    widget.border_title = title
+    return widget
+
+
+def controls(start: Settings) -> list[Widget]:
+    """The controls of §7.1, holding `start` as given: the main screen's pane and
+    the settings screen's form are both built here, so they match (§7.4)."""
+    return [
+        Horizontal(
+            titled(Input(str(start.length), id="length", type="integer"), "Length"),
+            titled(Input(str(start.count), id="count", type="integer"), "Count"),
+            id="numbers",
+        ),
+        titled(
+            SelectionList[str](
+                *((name, name, name in start.charsets) for name in CHARSETS), id="charsets"
+            ),
+            "Sets",
+        ),
+        titled(Input(start.custom, id="custom"), "Custom"),
+        Grid(
+            *(Checkbox(label, getattr(start, setting), id=wid) for wid, label, setting in OPTIONS),
+            id="options",
+        ),
+    ]
+
+
+def read_controls(node: DOMNode) -> Settings:
+    """The controls under `node` as one `Settings`, unvalidated and with no default
+    fill (§7.1); an integer input that doesn't parse counts as 0."""
+    selected = set(node.query_one("#charsets", SelectionList).selected)
+    options = {setting: node.query_one(f"#{wid}", Checkbox).value for wid, _, setting in OPTIONS}
+    return Settings(
+        length=parse_int(node.query_one("#length", Input).value),
+        count=parse_int(node.query_one("#count", Input).value),
+        charsets=tuple(name for name in CHARSETS if name in selected),
+        custom=node.query_one("#custom", Input).value,
+        **options,
+    )
+
+
+def set_controls(node: DOMNode, settings: Settings) -> None:
+    """Set the controls under `node` to `settings`, as `controls` builds them."""
+    node.query_one("#length", Input).value = str(settings.length)
+    node.query_one("#count", Input).value = str(settings.count)
+    sets = node.query_one("#charsets", SelectionList)
+    sets.deselect_all()
+    for name in settings.charsets:
+        sets.select(name)
+    node.query_one("#custom", Input).value = settings.custom
+    for wid, _, setting in OPTIONS:
+        node.query_one(f"#{wid}", Checkbox).value = getattr(settings, setting)
+
+
+class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
+    """The settings file as a form: `,` opens it (§7.4, DEC-20).
+
+    It holds the main screen's controls, filled with `start`, and the file's
+    `path` as it resolved on opening. Save validates the form as the banner
+    does and writes the file, closing with the settings and the path it
+    saved to; Cancel and `escape` close with None. The form's messages stop
+    here, so nothing in it reaches the main screen's handlers.
+    """
+
+    # The form's only key: the main screen's don't act while it is open (DEC-20).
+    BINDINGS: ClassVar[list[BindingType]] = [Binding("escape", "cancel", show=False)]
+    # The first control. Left unset, the screen takes the App's "#results",
+    # which it lacks, and nothing has focus.
+    AUTO_FOCUS = "#length"
+
+    def __init__(self, start: Settings, path: Path) -> None:
+        super().__init__()
+        self.start = start
+        self.path = path
+
+    def compose(self) -> ComposeResult:
+        # The dialog scrolls as a whole when the terminal is too short for it.
+        with VerticalScroll(id="dialog") as dialog:
+            dialog.border_title = "Settings"
+            # A path can hold `[`, so it is shown as text, not markup.
+            yield Static(str(self.path), id="path", markup=False)
+            with Vertical(id="form"):
+                yield from controls(self.start)
+            with Horizontal(id="buttons"):
+                yield Button("Save", id="save", variant="primary")
+                yield Button("Cancel", id="cancel")
+
+    # The App's handlers would check the main screen's controls, and `enter`
+    # would jumble there (§7.2): the form's messages go no further than here.
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        event.stop()
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        event.stop()
+
+    def on_selection_list_selected_changed(self, event: SelectionList.SelectedChanged) -> None:
+        event.stop()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        # `enter` in a form input saves, as the Save button does (§7.4).
+        event.stop()
+        self.action_save()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if event.button.id == "save":
+            self.action_save()
+        else:
+            self.action_cancel()
+
+    def action_save(self) -> None:
+        """Validate the form, write the file, and close with what was saved (§7.4)."""
+        settings = read_controls(self)
+        try:
+            # The banner's check, so the form and the main screen agree (§7.1, DEC-20).
+            strength(settings)
+        except JumbleError as e:
+            self.app.notify(str(e), severity="error")
+            return
+        # Resolved now, not on opening (§7.4).
+        path = config_path()
+        try:
+            save(path, settings)
+        except JumbleError as e:
+            # `save`'s own failure: the screen stays open, the main screen as it was.
+            self.app.notify(str(e), severity="error")
+            return
+        self.dismiss((settings, path))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class JumbleApp(App[None]):
     # The results pane holds focus so letter keys reach the bindings (DEC-12).
     AUTO_FOCUS = "#results"
     CSS = """
     #error { display: none; background: $error; color: $text; padding: 0 1; }
     #error.shown { display: block; }
-    #controls { width: 50; border-right: solid $panel; }
+    #controls { width: 54; border-right: solid $panel; }
+    SettingsScreen { align: center middle; }
+    #dialog { width: 58; height: auto; max-height: 100%; border: thick $primary; padding: 0 1; }
+    #form { height: auto; }
+    #path { color: $text-muted; }
+    #buttons { height: auto; align-horizontal: right; }
+    #buttons Button { margin-left: 1; }
     #numbers { height: auto; }
     #numbers Input { width: 1fr; }
     #charsets { height: 12; }
@@ -61,6 +212,7 @@ class JumbleApp(App[None]):
         ("a", "copy_all", "Copy all"),
         ("s", "save", "Save"),
         ("d", "save_defaults", "Save defaults"),
+        ("comma", "settings", "Settings"),
         ("q", "quit", "Quit"),
         Binding("escape", "focus_results", show=False),
     ]
@@ -86,43 +238,26 @@ class JumbleApp(App[None]):
         yield Static(id="error")
         with Horizontal():
             with VerticalScroll(id="controls"):
-                with Horizontal(id="numbers"):
-                    yield Input(str(start.length), id="length", type="integer")
-                    yield Input(str(start.count), id="count", type="integer")
-                yield SelectionList[str](
-                    *((name, name, name in start.charsets) for name in CHARSETS),
-                    id="charsets",
-                )
-                yield Input(start.custom, id="custom")
-                with Grid(id="options"):
-                    for widget_id, label, setting in OPTIONS:
-                        yield Checkbox(label, getattr(start, setting), id=widget_id)
+                yield from controls(start)
             # Strings can hold `[`, so they are shown as text, not markup.
             yield OptionList(id="results", markup=False)
         yield Footer()
 
     def on_mount(self) -> None:
-        for selector, title in TITLES:
-            self.query_one(selector).border_title = title
         # An invalid start shows the banner and jumbles nothing (§7.2, §7.5).
         self.check()
         self.action_jumble()
         if self.file_error:
             self.notify(self.file_error, severity="error")
 
+    @property
+    def main(self) -> DOMNode:
+        """The main screen, under the settings screen while that is open."""
+        return self.screen_stack[0]
+
     def settings(self) -> Settings:
-        """The controls as one `Settings`, unvalidated and with no default fill (§7.1)."""
-        selected = set(self.query_one("#charsets", SelectionList).selected)
-        options = {
-            setting: self.query_one(f"#{wid}", Checkbox).value for wid, _, setting in OPTIONS
-        }
-        return Settings(
-            length=parse_int(self.query_one("#length", Input).value),
-            count=parse_int(self.query_one("#count", Input).value),
-            charsets=tuple(name for name in CHARSETS if name in selected),
-            custom=self.query_one("#custom", Input).value,
-            **options,
-        )
+        """The main screen's controls as one `Settings`, unvalidated, no default fill (§7.1)."""
+        return read_controls(self.main)
 
     def check(self) -> None:
         """Validate the controls: set the subtitle, or show the §6 message (§7.1)."""
@@ -238,4 +373,26 @@ class JumbleApp(App[None]):
         except JumbleError as e:
             self.notify(str(e), severity="error")
             return
+        self.notify(f"Saved defaults to {path}")
+
+    def action_settings(self) -> None:
+        """Open the settings screen on the settings file (§7.4, DEC-20)."""
+        path = config_path()
+        try:
+            start = file_settings(load(path))
+        except JumbleError as e:
+            # The built-in defaults, so Save repairs the file (DEC-17).
+            start = DEFAULTS
+            self.notify(str(e), severity="error")
+        self.push_screen(SettingsScreen(start, path), self.saved)
+
+    def saved(self, result: tuple[Settings, Path] | None) -> None:
+        """After the settings screen: set the controls to what it saved (§7.4)."""
+        if result is None:
+            return
+        settings, path = result
+        set_controls(self.main, settings)
+        # Setting a control posts its change for later: check now, so the
+        # banner and the subtitle follow before the toast. No jumble (§7.1).
+        self.check()
         self.notify(f"Saved defaults to {path}")

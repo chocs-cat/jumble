@@ -128,6 +128,42 @@ def test_draws_use_randbelow(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == [10] * 5
 
 
+def test_the_alphabet_is_the_sets_joined_in_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    # §2.4 step 4: canonical order, custom last, so a draw of index i is the
+    # alphabet's i-th character: lower (0-25), then digits (26-35), then "!".
+    picks = iter([0, 25, 26, 35, 36])
+    monkeypatch.setattr(secrets, "randbelow", lambda n: next(picks))
+    assert generate(Settings(length=5, charsets=("digits", "lower"), custom="!")) == ["az09!"]
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        Settings(length=5, count=3, no_repeat=True),
+        Settings(length=5, count=3, each=True),
+        Settings(length=5, count=3, each=True, no_repeat=True),
+    ],
+)
+def test_samples_and_shuffles_use_randbelow(
+    monkeypatch: pytest.MonkeyPatch, settings: Settings
+) -> None:
+    # Samples and shuffles are built on randbelow too (§3, DEC-1, DEC-6): with
+    # it fixed, every run draws the same strings.
+    calls: list[int] = []
+
+    def randbelow(n: int) -> int:
+        calls.append(n)
+        return 0
+
+    monkeypatch.setattr(secrets, "randbelow", randbelow)
+    first = generate(settings)
+    assert calls
+    assert all(generate(settings) == first for _ in range(20))
+    if not settings.each:
+        # A partial Fisher-Yates that always picks the first remaining item.
+        assert first == ["abcde"] * 3
+
+
 def test_no_random_module_in_src() -> None:
     src = Path(__file__).parent.parent / "src"
     pattern = re.compile(r"^\s*(import\s+random\b|from\s+random\b)|SystemRandom", re.MULTILINE)

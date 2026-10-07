@@ -5,10 +5,9 @@ import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
 from typing import Any
 
-from jumble.config import config_path, load
+from jumble.config import config_path, file_settings, load
 from jumble.generate import (
     CHARSETS,
     LOOK_ALIKES,
@@ -101,10 +100,11 @@ def parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
     sub.add_parser(
         "tui",
-        help="open the interactive generator, starting from the options before tui "
-        "(not with --output, --json, or --strength)",
-        description="Open the interactive generator. Options given before tui set its "
-        "starting values, for example: jumble -n 32 -s digits tui",
+        # It starts from the effective settings, the file's included (§7.5).
+        help="open the interactive generator, starting from the settings file and the "
+        "options before tui (not with --output, --json, or --strength)",
+        description="Open the interactive generator. It starts from the settings file, "
+        "and options given before tui override it, for example: jumble -n 32 -s digits tui",
     )
     return p
 
@@ -117,9 +117,11 @@ def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings
     option counts when it is given, even at its default value, and a flag
     only turns its option on. The characters go as a whole: `-s` or
     `--custom` (even `--custom ''`) replaces both of the file's `charsets` and
-    `custom`. The default sets apply only when no level chose any.
+    `custom`. The default sets apply only when no level chose any. The
+    command line is laid over the file's keys and merged by
+    `config.file_settings`, so there is one merge.
     """
-    values = {key: file[key] for key in ("length", "count", *BOOLEANS) if key in file}
+    values = dict(file)
     for key in ("length", "count"):
         if getattr(args, key) is not None:
             values[key] = getattr(args, key)
@@ -128,13 +130,8 @@ def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings
             values[key] = True
     names = tuple(name for value in args.charset for name in value.split(","))
     if names or args.custom is not None:
-        charsets, custom = names, args.custom or ""
-    else:
-        charsets, custom = tuple(file.get("charsets", ())), file.get("custom", "")
-    if not charsets and not custom:
-        # Nothing chose any characters, so the default sets apply (§1, DEC-9).
-        charsets = DEFAULTS.charsets
-    return replace(DEFAULTS, **values, charsets=charsets, custom=custom)
+        values["charsets"], values["custom"] = names, args.custom or ""
+    return file_settings(values)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

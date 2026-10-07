@@ -7,14 +7,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from textual.app import App
+from textual.geometry import Region
 from textual.pilot import Pilot
-from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
+from textual.widget import Widget
+from textual.widgets import Button, Checkbox, Input, OptionList, SelectionList, Static
 
 from jumble import tui
-from jumble.cli import main
-from jumble.config import load
-from jumble.generate import CHARSETS, JumbleError, Settings, settings_dict
-from jumble.tui import JumbleApp
+from jumble.cli import main, parser, settings_from
+from jumble.config import file_settings, load
+from jumble.generate import CHARSETS, JumbleError, Settings, settings_dict, strength, strength_line
+from jumble.tui import JumbleApp, SettingsScreen, read_controls
 
 
 def results(app: JumbleApp) -> list[str]:
@@ -267,6 +270,21 @@ async def test_keys_before_any_strings_do_nothing(monkeypatch: pytest.MonkeyPatc
         assert results(app) == []
 
 
+async def test_q_quits() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        await pilot.press("q")
+        await pilot.pause()
+        assert not app.is_running
+
+
+async def test_the_main_screen_has_no_buttons() -> None:
+    # Keys in the footer, not a Jumble button (§7.2, DEC-12).
+    app = JumbleApp()
+    async with app.run_test():
+        assert not app.screen.query(Button)
+
+
 async def test_focus_starts_on_the_results() -> None:
     app = JumbleApp()
     async with app.run_test():
@@ -319,8 +337,11 @@ async def test_footer_keys() -> None:
             ("a", "Copy all"),
             ("s", "Save"),
             ("d", "Save defaults"),
+            ("comma", "Settings"),
             ("q", "Quit"),
         ]
+        comma = next(a.binding for a in bindings if a.binding.key == "comma")
+        assert app.get_key_display(comma) == ","
 
 
 GAVE_UP = "gave up after 100000 draws with 9 of 10 unique strings"
@@ -679,3 +700,399 @@ async def test_the_command_line_reads_what_d_saved(
     out = json.loads(capsys.readouterr().out)
     assert out["settings"] == settings_dict(saved)
     assert len(out["strings"]) == 3
+
+
+# `,` opens the settings screen, a form on the settings file (§7.4, DEC-20).
+# Its widgets are reached through `app.screen`: `app.query_one` searches the
+# main screen (AGENTS.md, Testing notes). At 100 by 30 the whole form shows,
+# so its buttons can be clicked without scrolling.
+
+SIZE = (100, 30)
+
+
+async def open_settings(pilot: Pilot[None]) -> SettingsScreen:
+    pilot.app.query_one("#results", OptionList).focus()
+    await pilot.press("comma")
+    await pilot.pause()
+    screen = pilot.app.screen
+    assert isinstance(screen, SettingsScreen)
+    return screen
+
+
+def form(app: App[None]) -> Settings:
+    return read_controls(app.screen)
+
+
+def form_selected(app: JumbleApp) -> list[str]:
+    return list(app.screen.query_one("#charsets", SelectionList).selected)
+
+
+async def set_form(pilot: Pilot[None], selector: str, value: str | bool) -> None:
+    """Set a form input to a string, or a form checkbox to a boolean."""
+    if isinstance(value, bool):
+        pilot.app.screen.query_one(selector, Checkbox).value = value
+    else:
+        pilot.app.screen.query_one(selector, Input).value = value
+    await pilot.pause()
+
+
+async def choose_only_in_form(pilot: Pilot[None], *names: str) -> None:
+    sets = pilot.app.screen.query_one("#charsets", SelectionList)
+    sets.deselect_all()
+    for name in names:
+        sets.select(name)
+    await pilot.pause()
+
+
+def settings_screens(app: JumbleApp) -> int:
+    return sum(isinstance(screen, SettingsScreen) for screen in app.screen_stack)
+
+
+async def test_comma_opens_the_settings_screen() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert settings_screens(app) == 1
+        # Focus starts on the first control.
+        assert app.focused is app.screen.query_one("#length", Input)
+
+
+async def test_the_form_holds_the_main_screens_controls() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        screen = app.screen
+        for selector, title in (
+            ("#length", "Length"),
+            ("#count", "Count"),
+            ("#charsets", "Sets"),
+            ("#custom", "Custom"),
+        ):
+            assert screen.query_one(selector).border_title == title
+            assert app.query_one(selector).border_title == title
+        for wid, label, _ in tui.OPTIONS:
+            assert str(screen.query_one(f"#{wid}", Checkbox).label) == label
+        sets = screen.query_one("#charsets", SelectionList)
+        assert [sets.get_option_at_index(i).value for i in range(sets.option_count)] == list(
+            CHARSETS
+        )
+
+
+async def test_the_form_is_filled_from_the_file_not_the_main_screen(config_file: Path) -> None:
+    config_file.write_text('length = 24\ncustom = "abc"\n')
+    app = JumbleApp(Settings(length=8))  # as `jumble -n 8 tui` starts
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        screen = app.screen
+        assert screen.query_one("#length", Input).value == "24"
+        assert form_selected(app) == []
+        assert screen.query_one("#custom", Input).value == "abc"
+        assert form(app) == Settings(length=24, charsets=(), custom="abc")
+        assert app.query_one("#length", Input).value == "8"
+        assert app.settings() == Settings(length=8)
+
+
+@pytest.mark.parametrize("text", [None, "charsets = []\n"])
+async def test_a_file_choosing_no_characters_fills_the_defaults(
+    config_file: Path, text: str | None
+) -> None:
+    if text is not None:
+        config_file.write_text(text)
+    app = JumbleApp(Settings(length=8, charsets=("digits",)))
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert form(app) == Settings()
+        assert form_selected(app) == ["lower", "upper", "digits"]
+
+
+FILES = [
+    None,
+    "charsets = []\n",
+    'length = 24\ncustom = "abc"\n',
+    'length = 12\ncount = 4\ncharsets = ["digits", "greek"]\ncustom = "!?"\n'
+    "no_ambiguous = true\neach = true\nno_repeat = true\nunique = true\n",
+]
+
+
+@pytest.mark.parametrize("text", FILES)
+async def test_the_form_and_the_command_line_merge_a_file_alike(
+    config_file: Path, text: str | None
+) -> None:
+    # One merge (§5.2): the command line with no options, the form, and
+    # `file_settings` agree on every file.
+    if text is not None:
+        config_file.write_text(text)
+    file = load(config_file)
+    assert settings_from(parser().parse_args([]), file) == file_settings(file)
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert form(app) == file_settings(file)
+
+
+async def test_the_form_shows_the_files_path(config_file: Path) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert str(app.screen.query_one("#path", Static).content) == str(config_file)
+
+
+async def test_the_form_shows_the_path_as_pathlib_writes_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("JUMBLE_CONFIG", "./rel/config.toml")
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert str(app.screen.query_one("#path", Static).content) == "rel/config.toml"
+
+
+async def test_an_invalid_file_fills_the_defaults_and_save_repairs_it(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file.write_text("length = 0\n")
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        await open_settings(pilot)
+        assert form(app) == Settings()
+        assert record.toasts == [f"{config_file}: length: length must be at least 1"]
+        assert record.severities == ["error"]
+        await pilot.click("#save")
+        await pilot.pause()
+        assert load(config_file) == settings_dict(Settings())
+        assert record.toasts[-1] == f"Saved defaults to {config_file}"
+
+
+async def test_a_file_that_cant_be_read_or_saved(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file.mkdir()
+    app = JumbleApp(Settings(length=8))
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        await open_settings(pilot)
+        assert form(app) == Settings()
+        assert record.toasts == [f"can't read {config_file}: Is a directory"]
+        await pilot.click("#save")
+        await pilot.pause()
+        assert record.toasts[-1] == f"can't save {config_file}: Is a directory"
+        assert record.severities == ["error", "error"]
+        assert settings_screens(app) == 1
+        assert app.settings() == Settings(length=8)
+
+
+async def change_form(pilot: Pilot[None]) -> Settings:
+    """Set every form control away from the defaults; the settings they hold."""
+    await set_form(pilot, "#length", "20")
+    await set_form(pilot, "#count", "4")
+    await choose_only_in_form(pilot, "lower", "greek")
+    await set_form(pilot, "#custom", "!?")
+    for wid, _, _ in tui.OPTIONS:
+        await set_form(pilot, f"#{wid}", True)
+    saved = Settings(20, 4, ("lower", "greek"), "!?", True, True, True, True)
+    assert form(pilot.app) == saved
+    return saved
+
+
+async def test_save_writes_the_file_and_sets_the_main_screen(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        strings = list(app.strings)
+        await open_settings(pilot)
+        saved = await change_form(pilot)
+        await pilot.click("#save")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert load(config_file) == settings_dict(saved)
+        assert app.settings() == saved
+        assert banner(app) is None
+        assert app.sub_title == strength_line(strength(saved))
+        # No jumble: the results stay (§7.1).
+        assert app.strings == strings
+        assert (record.toasts, record.severities) == (
+            [f"Saved defaults to {config_file}"],
+            ["information"],
+        )
+
+
+async def test_save_clears_the_banner(config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp(Settings(length=0))
+    async with app.run_test(size=SIZE) as pilot:
+        assert banner(app) == "length must be at least 1"
+        # The banner and the subtitle as the toast shows: already the saved values'.
+        seen: list[tuple[str, str | None, str]] = []
+        monkeypatch.setattr(
+            app, "notify", lambda message, **_: seen.append((message, banner(app), app.sub_title))
+        )
+        await open_settings(pilot)
+        await pilot.click("#save")
+        await pilot.pause()
+        assert seen == [(f"Saved defaults to {config_file}", None, VALID)]
+        assert app.settings() == Settings()
+        assert banner(app) is None
+        assert app.sub_title == VALID
+        assert app.strings == []
+
+
+async def test_save_resolves_the_path_when_it_saves(
+    tmp_path: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The path at the time of the save, not when the screen opened (§7.4).
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        await open_settings(pilot)
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("JUMBLE_CONFIG", "./later/config.toml")
+        await pilot.click("#save")
+        await pilot.pause()
+        assert not config_file.exists()
+        assert load(tmp_path / "later" / "config.toml") == settings_dict(Settings())
+        assert record.toasts == ["Saved defaults to later/config.toml"]
+
+
+async def test_enter_in_a_form_input_saves_and_doesnt_jumble(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The form's `Input.Submitted` would reach `JumbleApp.on_input_submitted`
+    # and jumble, if the screen let it bubble on.
+    app = JumbleApp(Settings(count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        strings = list(app.strings)
+        await open_settings(pilot)
+        saved = await change_form(pilot)
+        app.screen.query_one("#custom", Input).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert load(config_file) == settings_dict(saved)
+        assert app.settings() == saved
+        assert app.strings == strings
+        assert record.toasts == [f"Saved defaults to {config_file}"]
+
+
+async def test_the_form_doesnt_reach_the_main_screen_until_save() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        await set_form(pilot, "#length", "0")
+        await choose_only_in_form(pilot)
+        await set_form(pilot, "#each", True)
+        assert banner(app) is None
+        assert app.sub_title == VALID
+        assert app.settings() == Settings()
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"#length": "0"}, "length must be at least 1"),
+        (
+            {"#length": "2", "#each": True},
+            "length must be at least 3 to take one character from each of 3 sets",
+        ),
+    ],
+)
+async def test_an_invalid_form_saves_nothing(
+    config_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    changes: dict[str, str | bool],
+    message: str,
+) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        await open_settings(pilot)
+        for selector, value in changes.items():
+            await set_form(pilot, selector, value)
+        await pilot.click("#save")
+        await pilot.pause()
+        assert not config_file.exists()
+        assert settings_screens(app) == 1
+        assert (record.toasts, record.severities) == ([message], ["error"])
+        assert app.settings() == Settings()
+
+
+@pytest.mark.parametrize("how", ["cancel", "escape"])
+async def test_cancel_and_escape_change_nothing(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, how: str
+) -> None:
+    config_file.write_text("# mine\nlength = 24\n")
+    before = config_file.read_bytes()
+    app = JumbleApp(Settings(length=8))
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        await open_settings(pilot)
+        await change_form(pilot)
+        if how == "cancel":
+            await pilot.click("#cancel")
+        else:
+            app.screen.query_one("#custom", Input).focus()
+            await pilot.press("escape")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert config_file.read_bytes() == before
+        assert app.settings() == Settings(length=8)
+        assert record.toasts == []
+
+
+async def test_main_screen_keys_dont_act_in_the_form(
+    here: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        record = Recorder(app, monkeypatch)
+        strings = list(app.strings)
+        await open_settings(pilot)
+        app.screen.query_one("#each", Checkbox).focus()
+        await pilot.press("g", "c", "a", "s", "d", "comma", "q")
+        await pilot.pause()
+        assert app.is_running
+        assert settings_screens(app) == 1
+        assert isinstance(app.screen, SettingsScreen)
+        assert app.strings == strings
+        assert list(here.iterdir()) == []
+        assert not config_file.exists()
+        assert (record.copied, record.toasts) == ([], [])
+        assert app.screen.query_one("#each", Checkbox).value is False
+
+
+async def test_the_save_button_is_a_button() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await open_settings(pilot)
+        assert str(app.screen.query_one("#save", Button).label) == "Save"
+        assert str(app.screen.query_one("#cancel", Button).label) == "Cancel"
+
+
+# Every label shows whole at 100 by 30, `One from each set` included (§7.1, #12).
+
+
+def rendered(widget: Widget) -> str:
+    """The text `widget` draws in its region, its border included."""
+    size = widget.region
+    return "\n".join(s.text for s in widget.render_lines(Region(0, 0, size.width, size.height)))
+
+
+LABELS = [(f"#{wid}", label) for wid, label, _ in tui.OPTIONS] + [
+    ("#length", "Length"),
+    ("#count", "Count"),
+    ("#charsets", "Sets"),
+    ("#custom", "Custom"),
+]
+
+
+async def test_every_label_shows_whole() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        for screen in (app.screen, await open_settings(pilot)):
+            for selector, label in LABELS:
+                text = rendered(screen.query_one(selector))
+                assert label in text, selector
+                assert "…" not in text, selector

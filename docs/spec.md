@@ -470,6 +470,8 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
     were (§7.1).
   - Nothing typed or chosen in the form reaches the main screen except
     through a successful Save.
+  - Focus starts on the form's first control, the Length input. Its only
+    key of its own is `escape`.
 
 Either route writes to the §5.1 path as it resolves at the time of the save,
 even when the TUI was started with `--no-config`. A successful save's toast

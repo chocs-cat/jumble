@@ -119,3 +119,22 @@ notes told the executor to treat "tomlkit's parse error" as an unparsable
 file. tomlkit reads TOML 1.1, so a save would have kept `custom = "\x41"`
 as equal to `custom = "A"` and left a file the command line refuses. The
 executor found it and logged DEC-19.
+
+### §6. A note states a library's behavior the cut didn't probe
+
+**Shape:** the cut probes some of a framework's behavior and records it in
+*Notes for the executor*, then states another behavior (a default, an
+ordering, what a call returns) beside it without probing that one. Both read
+as probed. The executor trusts the note, or has to discover that it is
+wrong and decide what the docs meant.
+
+**Check:** for each statement a brief makes about a library's behavior,
+either probe it at the cut (and say so) or turn it into a requirement the
+docs own ("focus starts on Length"), leaving the mechanism to the executor.
+
+**Provenance:** P0001-C07. Its notes, probed on Textual 8.2.8 for message
+bubbling and `query_one`, also said the settings screen's focus "starts
+where Textual puts it (the first control)". A pushed screen with no
+`AUTO_FOCUS` takes the App's `#results`, which the form lacks, so nothing
+had focus. The executor set `AUTO_FOCUS = "#length"` and reported it; the
+review added the rule to spec §7.4.
