@@ -98,3 +98,24 @@ hint or the doc before cutting.
 given"; unit a told the executor to print `str(path)` of a `Path`, which
 turns `./cfg.toml` into `cfg.toml`. The executor built the brief and filed
 #14; the review amended §5.1 (DEC-18).
+
+### §5. A second component asked to judge what the docs give to one
+
+**Shape:** the docs settle a judgement (is this valid, are these equal, how
+is this written) by one component, and the brief hands the same judgement to
+another one elsewhere (a second library, a second form, a second parser) on
+the assumption that the two agree. They differ at the edges, and the second
+accepts what the first refuses, so one front end lets through what the other
+then rejects.
+
+**Check:** for each judgement a brief assigns to a library or a new piece of
+code, find the component the authority docs already use for it. Have the
+brief call that one, or defer to it, rather than a look-alike; where a
+second one is unavoidable, name the cases where they differ and require a
+test of one.
+
+**Provenance:** P0001-C06. Spec §5.1 judges TOML with `tomllib`; unit a's
+notes told the executor to treat "tomlkit's parse error" as an unparsable
+file. tomlkit reads TOML 1.1, so a save would have kept `custom = "\x41"`
+as equal to `custom = "A"` and left a file the command line refuses. The
+executor found it and logged DEC-19.
