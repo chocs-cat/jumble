@@ -12,6 +12,7 @@ from textual.containers import Grid, Horizontal, VerticalScroll
 from textual.widgets import Checkbox, Footer, Header, Input, OptionList, SelectionList, Static
 from textual.widgets.option_list import Option
 
+from jumble.config import config_path, save
 from jumble.generate import CHARSETS, JumbleError, Settings, generate, strength, strength_line
 
 DEFAULTS = Settings()
@@ -59,6 +60,7 @@ class JumbleApp(App[None]):
         ("c", "copy", "Copy"),
         ("a", "copy_all", "Copy all"),
         ("s", "save", "Save"),
+        ("d", "save_defaults", "Save defaults"),
         ("q", "quit", "Quit"),
         Binding("escape", "focus_results", show=False),
     ]
@@ -73,6 +75,8 @@ class JumbleApp(App[None]):
         self.title = f"jumble {version('jumble')}"
         self.strings: list[str] = []
         self.valid = False
+        # The banner's §6 message while the controls are invalid (§7.1).
+        self.problem = ""
 
     def compose(self) -> ComposeResult:
         # The starting values go in here, not in `on_mount`, so the first
@@ -127,11 +131,13 @@ class JumbleApp(App[None]):
             line = strength_line(strength(self.settings()))
         except JumbleError as e:
             self.valid = False
+            self.problem = str(e)
             self.sub_title = ""
-            error.update(str(e))
+            error.update(self.problem)
             error.add_class("shown")
             return
         self.valid = True
+        self.problem = ""
         self.sub_title = line
         error.remove_class("shown")
 
@@ -218,3 +224,18 @@ class JumbleApp(App[None]):
             self.notify(f"can't save {name}: {e.strerror}", severity="error")
             return
         self.notify(f"Saved {name}")
+
+    def action_save_defaults(self) -> None:
+        """Save the controls as the settings file's defaults (§7.4, DEC-18)."""
+        if not self.valid:
+            # Never a file the command line would refuse (§7.4).
+            self.notify(self.problem, severity="error")
+            return
+        # Resolved now, so a TUI started with --no-config saves too (§7.4).
+        path = config_path()
+        try:
+            save(path, self.settings())
+        except JumbleError as e:
+            self.notify(str(e), severity="error")
+            return
+        self.notify(f"Saved defaults to {path}")

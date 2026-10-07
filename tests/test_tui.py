@@ -1,4 +1,5 @@
 import errno
+import json
 import time
 from collections.abc import Iterator
 from importlib.metadata import version
@@ -10,7 +11,9 @@ from textual.pilot import Pilot
 from textual.widgets import Checkbox, Input, OptionList, SelectionList, Static
 
 from jumble import tui
-from jumble.generate import CHARSETS, JumbleError, Settings
+from jumble.cli import main
+from jumble.config import load
+from jumble.generate import CHARSETS, JumbleError, Settings, settings_dict
 from jumble.tui import JumbleApp
 
 
@@ -315,6 +318,7 @@ async def test_footer_keys() -> None:
             ("c", "Copy"),
             ("a", "Copy all"),
             ("s", "Save"),
+            ("d", "Save defaults"),
             ("q", "Quit"),
         ]
 
@@ -564,3 +568,114 @@ async def test_s_before_any_strings_saves_nothing(
         await pilot.press("s")
         assert list(here.iterdir()) == []
         assert record.toasts == []
+
+
+# `d` saves the controls as the defaults (§7.4, DEC-18).
+
+
+async def change_controls(pilot: Pilot[None]) -> None:
+    await set_value(pilot, "#length", "24")
+    await set_value(pilot, "#count", "3")
+    await choose_only(pilot, "digits", "lower")
+    await set_value(pilot, "#custom", "!?")
+    await check(pilot, "#each")
+    pilot.app.query_one("#results", OptionList).focus()
+
+
+async def test_d_saves_the_controls(config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await change_controls(pilot)
+        await pilot.press("d")
+        saved = Settings(length=24, count=3, charsets=("lower", "digits"), custom="!?", each=True)
+        assert app.settings() == saved
+        assert load(config_file) == settings_dict(saved)
+        assert record.toasts == [f"Saved defaults to {config_file}"]
+        assert record.severities == ["information"]
+
+
+async def test_d_while_invalid_saves_nothing(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(length=0))  # as `jumble -n 0 tui` starts
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("d")
+        assert not config_file.exists()
+        assert (record.toasts, record.severities) == (["length must be at least 1"], ["error"])
+
+
+async def test_d_while_invalid_after_a_change_names_the_banner(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await choose_only(pilot)
+        app.query_one("#results", OptionList).focus()
+        await pilot.press("d")
+        assert not config_file.exists()
+        assert banner(app) == "choose at least one character set"
+        assert record.toasts == ["choose at least one character set"]
+        # Valid again: `d` saves.
+        await choose_only(pilot, "digits")
+        await pilot.press("d")
+        assert load(config_file)["charsets"] == ["digits"]
+        assert record.toasts[-1] == f"Saved defaults to {config_file}"
+
+
+async def test_d_repairs_the_file_the_tui_started_without(config_file: Path) -> None:
+    # A broken file starts the TUI from the defaults and the command line's
+    # options; `d` replaces the bad value (DEC-17, DEC-18).
+    config_file.write_text("length = 0  # too short\n")
+    with pytest.raises(JumbleError):
+        load(config_file)
+    app = JumbleApp(Settings(length=8), file_error=f"{config_file}: length: ...")
+    async with app.run_test() as pilot:
+        await pilot.press("d")
+        assert load(config_file) == settings_dict(Settings(length=8))
+        assert config_file.read_text().startswith("length = 8  # too short\n")
+
+
+async def test_d_resolves_the_path_when_it_saves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The path at the time of the save, not at start: a TUI started with
+    # --no-config still saves (§7.4). As pathlib writes it (§5.1).
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("JUMBLE_CONFIG", "./later/config.toml")
+        await pilot.press("d")
+        assert load(tmp_path / "later" / "config.toml") == settings_dict(Settings())
+        assert record.toasts == ["Saved defaults to later/config.toml"]
+
+
+async def test_d_when_the_file_cant_be_saved(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_file.mkdir()
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        record = Recorder(app, monkeypatch)
+        await pilot.press("d")
+        assert app.is_running
+        assert record.toasts == [f"can't save {config_file}: Is a directory"]
+        assert record.severities == ["error"]
+
+
+async def test_the_command_line_reads_what_d_saved(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        await change_controls(pilot)
+        await pilot.press("d")
+        saved = app.settings()
+    capsys.readouterr()
+    assert main(["--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["settings"] == settings_dict(saved)
+    assert len(out["strings"]) == 3

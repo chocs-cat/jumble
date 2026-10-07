@@ -152,15 +152,22 @@ least 1`, even when the command line overrides that key; fix the file or pass
 instead: `each = true` is fine in the file until `-n 2` asks for two
 characters from three sets.
 
+The TUI's `d` key writes the file: it saves the controls as they stand,
+changes only the values that differ, and keeps the file's comments and
+layout. With no file yet, it writes a commented template listing every key.
+A broken file is repaired by saving over it: unknown keys are dropped, bad
+values replaced, and a file that isn't TOML at all starts over from the
+template.
+
 ### The TUI
 
 `jumble tui` opens the generator in the terminal. It starts from the settings
 file, like the command line, and options given before `tui` override it:
 `jumble -n 32 -s digits tui` opens on 32-digit strings. A broken settings file
 doesn't stop the TUI: it opens from the built-in defaults and those options,
-with the error in a toast. An unknown set name is an error before the TUI
-opens; any other value it can't use (`-n 0`) opens it with the banner
-showing, to fix there.
+with the error in a toast, and `d` saves over it. An unknown set name is an
+error before the TUI opens; any other value it can't use (`-n 0`) opens it
+with the banner showing, to fix there.
 
 On the left are the controls: length and count, every character set in the
 table above to check or uncheck, custom characters, and the four options (No
@@ -181,6 +188,7 @@ The keys are listed in the footer:
 | `c` | copy the string under the cursor |
 | `a` | copy all strings, one per line |
 | `s` | save all strings to a new file, `jumble-<epoch>-<count>.txt`, in the current directory |
+| `d` | save the current controls as the defaults, in the settings file (not while the banner shows) |
 | `q` | quit |
 
 Focus starts on the strings, so the keys work. In a text box, `enter`
