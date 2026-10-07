@@ -90,6 +90,9 @@ Releases are automated with release-please, from Conventional Commits.
 - A focused `Input` swallows printable keys, even over priority bindings, so
   the TUI starts focus on the results pane (DEC-12). Tests that press letter
   keys must not leave an input focused.
+- With a screen pushed over the main one, `app.query_one` still searches the
+  main screen; reach the pushed screen's widgets through `app.screen`
+  (Textual 8.2.8).
 - Tests never touch the real settings file: an autouse fixture in
   `tests/conftest.py` (`config_file`) points `$JUMBLE_CONFIG` at a missing
   file under `tmp_path` for every test, subprocesses included. A test that

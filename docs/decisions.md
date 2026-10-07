@@ -249,3 +249,24 @@ save would then report success over a file that still breaks every run.
 Added during P0001-C06-a.
 
 *Where:* docs/spec.md §5.3.
+
+## DEC-20: The settings screen edits the file, not the session (2026-10)
+
+`d` saves the main screen's controls; `,` opens a form on the settings file
+itself. So the form starts from the file's values over the built-in
+defaults (spec §5.2 with no command line), not from the main screen, which
+may carry options given before `tui`; filling it from the main screen
+would make it `d` with extra steps. A file the TUI can't use fills the form
+with the built-in defaults and shows its error, as at start, because the
+form is the way to repair the file (DEC-17). The form uses the main
+screen's controls and the banner's validation, so the two can't disagree
+about what is valid; an invalid form is reported when Save is pressed, in
+an error toast, as `d` reports invalid controls, rather than in a second
+live banner. A successful Save replaces every main-screen control with the
+saved values and doesn't jumble: as on the main screen, only a jumble
+changes the results. `enter` in a form input saves, as a form's `enter`
+submits; the main screen's keys don't act while the form is open, so
+nothing reaches the main screen except through Save. Added at the cut of
+P0001-C07.
+
+*Where:* docs/spec.md §7.4.

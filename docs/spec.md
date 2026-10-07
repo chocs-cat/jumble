@@ -388,7 +388,8 @@ as the command line (`jumble.generate`).
   set in canonical order to check or uncheck, the custom-characters input, and
   the four options as checkboxes. A length or count input that doesn't parse
   as an integer (empty, or `-` alone) counts as 0, so it shows §6's
-  `at least 1` message.
+  `at least 1` message. In a terminal of 100 columns by 30 rows, every
+  control's label shows whole, `One from each set` included (issue #12).
 - Results pane: the latest strings, one per row, with a cursor, which goes to
   the first string after each jumble. It shows at most the first 1000; a
   final row then reads `… and N more (s saves all)` and can't be highlighted.
@@ -447,7 +448,28 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
   the settings file (or the built-in defaults), the file's path, and Save and
   Cancel. Save validates (§6), writes the file, closes the screen, and sets the
   main screen's controls to the saved values; Cancel and `escape` close it
-  without change. Main-screen keys don't act while it is open.
+  without change. Main-screen keys don't act while it is open (DEC-20):
+  - The form holds the same controls as the main screen's controls pane
+    (§7.1), with the same labels and the same reading of an input that
+    doesn't parse. It is filled with the file's values over the built-in
+    defaults, merged as §5.2 merges them with no command line: a file of
+    `custom = "abc"` alone checks no set, and a file that chooses no
+    characters checks the default sets. The command line's options and the
+    main screen's controls play no part. If the file can't be read or is
+    invalid (§5.1), the form is filled with the built-in defaults and the
+    §6 message (without `jumble: error: `) shows in an error toast, as at
+    start, so Save repairs the file. The path shown is the §5.1 path as it
+    resolves when the screen opens, written as §5.1 says.
+  - Save is the Save button, or `enter` in one of the form's inputs. It
+    validates the form as the main screen's banner does (§7.1). While the
+    form is invalid, Save writes nothing, keeps the screen open, and shows
+    the §6 message in an error toast. A save that fails keeps the screen
+    open and changes nothing on the main screen. A save that succeeds sets
+    every main-screen control to the saved values, so the banner and the
+    subtitle follow them; it doesn't jumble, and the results stay as they
+    were (§7.1).
+  - Nothing typed or chosen in the form reaches the main screen except
+    through a successful Save.
 
 Either route writes to the §5.1 path as it resolves at the time of the save,
 even when the TUI was started with `--no-config`. A successful save's toast

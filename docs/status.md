@@ -1,27 +1,30 @@
 # Status
 
 Last updated 2026-10-07 by `relay-next`.
-Last review: P0001-C05, 2026-10-07.
+Last review: P0001-C06, 2026-10-07.
 
 ## Where this stands
 
 - The relay workflow was set up on 2026-10-06.
 - Project P0001 (full generator) became active on 2026-10-06; its design is in
-  `docs/spec.md` and DEC-2 – DEC-18.
+  `docs/spec.md` and DEC-2 – DEC-20.
 - D1 – D4 are accepted (P0001-C01 – C05, PRs #7, #9, #10, #11, #13); details
   in the project ledger.
-- P0001-C06 (D5's `config.save` and the `d` key) was cut on 2026-10-07 and is
-  ready for an executor. What remains of D5 after it: the `,` settings
-  screen, and the project's completion evidence.
-- **Do next:** `/relay-execute` to build P0001-C06.
+- D5: P0001-C06 (`config.save` and the `d` key) accepted on 2026-10-07
+  (PR #15).
+- P0001-C07 was cut on 2026-10-07 and is ready for an executor. What
+  remains of the project: D5's `,` settings screen, and the evidence for
+  the project's completion criteria (parity with `strings_aupif.py`, spec
+  coverage, README, help, and spec in agreement, a real-terminal run).
+- **Do next:** `/relay-execute` to build P0001-C07.
 
 ## In flight
 
-- **Chunk:** P0001-C06
-- **State:** awaiting review
-- **Branch:** `chunk/p0001-c06`
-- **Pull request:** `#15` (ready)
-- **Units committed:** a, b
+- **Chunk:** P0001-C07
+- **State:** ready for an executor
+- **Branch:** —
+- **Pull request:** —
+- **Units committed:** —
 
 (Fixed shape. `State` ∈ `ready for an executor` · `executing` ·
 `awaiting review` · `none`; `Branch`, `Pull request`, and `Units committed` are
@@ -46,3 +49,4 @@ One line per chunk: the decision-log IDs it added.
 - P0001-C03: DEC-15 added at its review; DEC-16 at the cut of P0001-C04.
 - P0001-C04: none (DEC-17 added at the cut of P0001-C05).
 - P0001-C05: none (DEC-18 added at its review).
+- P0001-C06: DEC-19 (DEC-20 added at the cut of P0001-C07).
