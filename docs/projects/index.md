@@ -7,12 +7,12 @@ turns that plan into chunk briefs, and `/relay-execute` builds them.
 The routing header has a fixed shape. `/relay-project` owns both lines, and
 `/relay-next` reads `Active project`.
 
-- **Active project:** P0001
+- **Active project:** —
 - **Next project ID:** P0002
 
 | Project | State | File | Started | Finished | Outcome |
 |---|---|---|---|---|---|
-| P0001 full generator | active | [P0001-full-generator.md](P0001-full-generator.md) | 2026-10-06 | — | — |
+| P0001 full generator | complete | [P0001-full-generator.md](P0001-full-generator.md) | 2026-10-06 | 2026-10-07 | `strings_aupif.py` parity, Unicode sets, saved settings |
 
 ## 1. What a project is
 
