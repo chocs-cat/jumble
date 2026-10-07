@@ -270,6 +270,21 @@ async def test_keys_before_any_strings_do_nothing(monkeypatch: pytest.MonkeyPatc
         assert results(app) == []
 
 
+async def test_q_quits() -> None:
+    app = JumbleApp()
+    async with app.run_test() as pilot:
+        await pilot.press("q")
+        await pilot.pause()
+        assert not app.is_running
+
+
+async def test_the_main_screen_has_no_buttons() -> None:
+    # Keys in the footer, not a Jumble button (§7.2, DEC-12).
+    app = JumbleApp()
+    async with app.run_test():
+        assert not app.screen.query(Button)
+
+
 async def test_focus_starts_on_the_results() -> None:
     app = JumbleApp()
     async with app.run_test():

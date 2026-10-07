@@ -100,10 +100,11 @@ def parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
     sub.add_parser(
         "tui",
-        help="open the interactive generator, starting from the options before tui "
-        "(not with --output, --json, or --strength)",
-        description="Open the interactive generator. Options given before tui set its "
-        "starting values, for example: jumble -n 32 -s digits tui",
+        # It starts from the effective settings, the file's included (§7.5).
+        help="open the interactive generator, starting from the settings file and the "
+        "options before tui (not with --output, --json, or --strength)",
+        description="Open the interactive generator. It starts from the settings file, "
+        "and options given before tui override it, for example: jumble -n 32 -s digits tui",
     )
     return p
 

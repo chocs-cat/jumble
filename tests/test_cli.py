@@ -34,6 +34,26 @@ def test_defaults_when_nothing_chosen() -> None:
     assert settings() == Settings()
 
 
+def test_long_options() -> None:
+    # Every option of §4 by its long name.
+    assert settings(
+        "--length",
+        "5",
+        "--count",
+        "2",
+        "--charset",
+        "digits,lower",
+        "--custom",
+        "!",
+        "--no-ambiguous",
+        "--each",
+        "--no-repeat",
+        "--unique",
+    ) == Settings(5, 2, ("digits", "lower"), "!", True, True, True, True)
+    args = parser().parse_args(["--output", "out.txt", "--json", "--strength", "--no-config"])
+    assert (args.output, args.json, args.strength, args.no_config) == ("out.txt", True, True, True)
+
+
 def test_commas_and_repeats_choose_the_same_sets() -> None:
     a, b = settings("-s", "lower,digits"), settings("-s", "lower", "-s", "digits")
     assert validate(a) == validate(b)
@@ -53,7 +73,9 @@ def test_custom_already_chosen(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("value", "name"), [("emoji", "emoji"), ("lower,", ""), ("lower,,digits", "")]
+    ("value", "name"),
+    # `custom` is not a set name: custom characters come only from --custom (§2.2).
+    [("emoji", "emoji"), ("lower,", ""), ("lower,,digits", ""), ("custom", "custom")],
 )
 def test_unknown_or_empty_set(value: str, name: str, capsys: pytest.CaptureFixture[str]) -> None:
     code, lines, err = run(["-s", value], capsys)
@@ -406,16 +428,17 @@ def test_tui_rejects_unknown_sets(
     assert launched.apps == []
 
 
-def test_tui_help_says_options_set_its_start(capsys: pytest.CaptureFixture[str]) -> None:
+def test_tui_help_says_what_sets_its_start(capsys: pytest.CaptureFixture[str]) -> None:
+    # The effective settings: the file, then the options before tui (§7.5).
     with pytest.raises(SystemExit):
         main(["tui", "--help"])
     out = " ".join(capsys.readouterr().out.split())
-    assert "Options given before tui set its starting values" in out
+    assert "It starts from the settings file, and options given before tui override it" in out
     assert "jumble -n 32 -s digits tui" in out
     with pytest.raises(SystemExit):
         main(["--help"])
     out = " ".join(capsys.readouterr().out.split())
-    assert "starting from the options before tui" in out
+    assert "starting from the settings file and the options before tui" in out
 
 
 # The settings file (§5): `config_file` is $JUMBLE_CONFIG, missing until written.
