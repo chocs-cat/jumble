@@ -252,7 +252,7 @@ report.
 | P0001-C05 | D4 | accepted | 2026-10-07 | PR #13, `417588b` |
 | P0001-C06 | D5 (`config.save`, `d`) | accepted | 2026-10-07 | PR #15, `e688e0b` |
 | P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | accepted with follow-ups | 2026-10-07 | PR #17, `120d1c2` |
-| P0001-C08 | D6 (#20) | ready for an executor | — | — |
+| P0001-C08 | D6 (#20); project completion's manual run repeated | accepted | 2026-10-07 | PR #22 (squash SHA added at closeout) |
 
 ## 8. Closeout
 
