@@ -97,6 +97,11 @@ Releases are automated with release-please, from Conventional Commits.
   `tests/conftest.py` (`config_file`) points `$JUMBLE_CONFIG` at a missing
   file under `tmp_path` for every test, subprocesses included. A test that
   needs a settings file takes `config_file` and writes it there.
+- Bare `jumble` opens the TUI when stdin and stdout are both terminals
+  (DEC-21), so another autouse fixture (`stdin_not_a_terminal`) gives every
+  test a stdin that isn't one, and `main([])` prints even under `pytest -s`.
+  A test of the terminal case sets both streams itself (`terminals` in
+  `tests/test_cli.py`).
 - Judge the gate by its exit code: don't pipe `make check` into `tail` or
   `head`, which hides a failure. After a hand mutation check, clear
   `__pycache__` (or set `PYTHONDONTWRITEBYTECODE=1`) before the next run:
