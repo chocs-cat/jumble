@@ -108,6 +108,7 @@ repo.
 | `docs/spec.md` §5.1, §5.3, §7.4 and `docs/decisions.md` DEC-18 (at the review of P0001-C05 and the cut of P0001-C06) | `PATH` as `pathlib` writes it (#14); a save's steps, value formats, and exact template; `d` refuses invalid controls; the save path and toasts | The brief's `str(path)` contradicted §5.1, and the C06 executor would otherwise have decided the rest. |
 | `docs/spec.md` §5.3 and `docs/decisions.md` DEC-19 (during P0001-C06-a) | A save keeps a file only when `tomllib` reads it | The brief named tomlkit's parse error as the test, and tomlkit reads TOML 1.1 (`brief-checklist §5`). |
 | `docs/spec.md` §7.1, §7.4 and `docs/decisions.md` DEC-20 (at the cut of P0001-C07) | Whole labels at 100 × 30 (#12); the settings screen's starting values, file errors, path, Save (button or `enter`), its validation and failures, and its effect on the main screen | Questions the C07 executor would otherwise have decided. |
+| `docs/spec.md` §7.4 (at the review of P0001-C07) | The settings screen's focus starts on its Length input; `escape` is its only key | The brief's note assumed Textual focuses a pushed screen's first control; it inherits the App's `#results` instead. |
 
 README.md is not changed by this planning work: it stays true to the shipped
 behavior, and each chunk updates it with the behavior it lands.
@@ -230,8 +231,8 @@ while the screen is open.
 | P0001-C03 | D3 (layout, validation, copy keys) | accepted with follow-ups | 2026-10-06 | PR #10, `db69003` |
 | P0001-C04 | D3 (give-up toast, starting values, `s`, screenshot) | accepted | 2026-10-07 | PR #11, `11d323c` |
 | P0001-C05 | D4 | accepted | 2026-10-07 | PR #13, `417588b` |
-| P0001-C06 | D5 (`config.save`, `d`) | accepted | 2026-10-07 | PR #15 |
-| P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | ready for an executor | — | — |
+| P0001-C06 | D5 (`config.save`, `d`) | accepted | 2026-10-07 | PR #15, `e688e0b` |
+| P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | accepted with follow-ups | 2026-10-07 | PR #17 |
 
 ## 8. Closeout
 
