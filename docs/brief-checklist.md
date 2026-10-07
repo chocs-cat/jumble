@@ -80,3 +80,21 @@ in the line itself.
 its prescribed test, `-c 200000`, overflows the buffer, so nothing stays
 buffered and the test passes without `quiet_stdout()`. The executor added a
 pipe closed before writing, which fails without it.
+
+### §4. An implementation hint changes output the docs pinned
+
+**Shape:** a *Build* line or a note suggests a convenient mechanism (a type,
+a library call, a conversion) for something whose observable output an
+authority section already fixes, and the mechanism alters that output in a
+case the planner didn't walk. The executor follows the brief, and the
+pinned wording is now false.
+
+**Check:** for each implementation hint that touches a pinned output, run
+the pinned examples and one awkward input through the hint by hand (or in a
+REPL) and compare with the section's wording; where they differ, change the
+hint or the doc before cutting.
+
+**Provenance:** P0001-C05. Spec §5.1 said `PATH` is `$JUMBLE_CONFIG` "as
+given"; unit a told the executor to print `str(path)` of a `Path`, which
+turns `./cfg.toml` into `cfg.toml`. The executor built the brief and filed
+#14; the review amended §5.1 (DEC-18).

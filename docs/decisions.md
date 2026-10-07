@@ -217,3 +217,22 @@ at once was the alternative; a settings file has eight keys, and one error
 at a time is what the command line does too. Added at the cut of P0001-C05.
 
 *Where:* docs/spec.md §5.1, §5.2, §6, §7.4.
+
+## DEC-18: A save repairs the file it writes, in place (2026-10)
+
+A save (spec §5.3) keeps what it can of the existing file and replaces what
+it can't use: unknown keys are removed, a wrong or different value is
+replaced on its own line, a missing key is appended, and a file that isn't
+UTF-8 or TOML is replaced by the template, since tomlkit can't keep the
+layout of what it can't parse. That is how the settings screen repairs a
+file the TUI started without (DEC-17). Refusing to save over a broken file
+was the alternative; it would leave the TUI no way to fix one. The write is
+in place, through a symlink, rather than a temporary file renamed over the
+target: a rename would replace the link and reset the file's permissions,
+and a settings file is small enough that a torn write is not worth that.
+`d` refuses invalid controls, so a save never writes a file the command line
+would then reject. Paths in messages are `pathlib`'s rendering, normalizing
+`./` and doubled slashes (issue #14), so the command line, the toasts, and
+the settings screen all show one form. Added at the review of P0001-C05.
+
+*Where:* docs/spec.md §5.1, §5.3, §7.4.

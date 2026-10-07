@@ -4,7 +4,7 @@
 - **Created:** 2026-10-06
 - **Ready:** 2026-10-06
 - **Completed:** —
-- **Decisions:** DEC-2 – DEC-17
+- **Decisions:** DEC-2 – DEC-18
 
 ## 1. Problem and outcome
 
@@ -105,6 +105,7 @@ repo.
 | `docs/spec.md` §7.1, §7.2 (at the cut of P0001-C03) | Header title and version source, the subtitle's exact text, unparsable number inputs, the results cursor and the unhighlightable `… more` row, the copy toasts, `enter` while invalid, keys before any result | Questions the C03 executor would otherwise have decided. |
 | `docs/spec.md` §7.1, §7.3, §7.5 and `docs/decisions.md` DEC-15, DEC-16 (at the review of P0001-C03 and the cut of P0001-C04) | A give-up in the TUI is an error toast; the save's name, bytes, toasts, and failures; `jumble … tui` rejects unknown set names and otherwise starts with the banner | The TUI's give-up crashed it, and the C04 executor would otherwise have decided the rest. |
 | `docs/spec.md` §5.1, §5.2, §6, §7.4 and `docs/decisions.md` DEC-17 (at the cut of P0001-C05) | The settings path's empty and relative variables; the read order and per-key checks; what counts as given on the command line; the file-error messages; the TUI's fallback with an invalid file | Questions the C05 executor would otherwise have decided. |
+| `docs/spec.md` §5.1, §5.3, §7.4 and `docs/decisions.md` DEC-18 (at the review of P0001-C05 and the cut of P0001-C06) | `PATH` as `pathlib` writes it (#14); a save's steps, value formats, and exact template; `d` refuses invalid controls; the save path and toasts | The brief's `str(path)` contradicted §5.1, and the C06 executor would otherwise have decided the rest. |
 
 README.md is not changed by this planning work: it stays true to the shipped
 behavior, and each chunk updates it with the behavior it lands.
@@ -225,8 +226,9 @@ while the screen is open.
 | P0001-C01 | D1 | accepted with follow-ups | 2026-10-06 | PR #7, `5453b64` |
 | P0001-C02 | D2 | accepted with follow-ups | 2026-10-06 | PR #9, `5efd848` |
 | P0001-C03 | D3 (layout, validation, copy keys) | accepted with follow-ups | 2026-10-06 | PR #10, `db69003` |
-| P0001-C04 | D3 (give-up toast, starting values, `s`, screenshot) | accepted | 2026-10-07 | PR #11 |
-| P0001-C05 | D4 | ready for an executor | — | — |
+| P0001-C04 | D3 (give-up toast, starting values, `s`, screenshot) | accepted | 2026-10-07 | PR #11, `11d323c` |
+| P0001-C05 | D4 | accepted | 2026-10-07 | PR #13 |
+| P0001-C06 | D5 (`config.save`, `d`) | ready for an executor | — | — |
 
 ## 8. Closeout
 

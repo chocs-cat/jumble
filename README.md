@@ -45,10 +45,11 @@ jumble -n 32 -s digits tui      # the same, starting from 32 digits
 | `--no-config` | ignore the settings file (below) |
 
 With no `-s` and no `--custom`, and no characters chosen in the settings
-file, jumble draws from `lower`, `upper`, and `digits`. A character that is in more than one chosen set counts once, in the
-first set of the table below, with `--custom` last; a choice left with no
-characters of its own is an error. Each character is one Unicode code point,
-so `--custom` rejects control and combining characters. Errors print
+file, jumble draws from `lower`, `upper`, and `digits`. A character that is
+in more than one chosen set counts once, in the first set of the table below,
+with `--custom` last; a choice left with no characters of its own is an
+error. Each character is one Unicode code point, so `--custom` rejects
+control and combining characters. Errors print
 `jumble: error: …` and exit 2; a failed write, to an `-o` file or to stdout,
 exits 1. When a pipe's reader stops early (`jumble -c 100000 | head -1`),
 jumble exits 1 without a message.
@@ -157,8 +158,9 @@ characters from three sets.
 file, like the command line, and options given before `tui` override it:
 `jumble -n 32 -s digits tui` opens on 32-digit strings. A broken settings file
 doesn't stop the TUI: it opens from the built-in defaults and those options,
-with the error in a toast. An unknown set name is an error before the TUI opens; any other value
-it can't use (`-n 0`) opens it with the banner showing, to fix there.
+with the error in a toast. An unknown set name is an error before the TUI
+opens; any other value it can't use (`-n 0`) opens it with the banner
+showing, to fix there.
 
 On the left are the controls: length and count, every character set in the
 table above to check or uncheck, custom characters, and the four options (No
