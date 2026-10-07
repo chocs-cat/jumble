@@ -1,9 +1,9 @@
 # Project P0001 — full generator
 
-- **State:** active
+- **State:** complete
 - **Created:** 2026-10-06
 - **Ready:** 2026-10-06
-- **Completed:** —
+- **Completed:** 2026-10-07
 - **Decisions:** DEC-2 – DEC-21
 
 ## 1. Problem and outcome
@@ -252,15 +252,40 @@ report.
 | P0001-C05 | D4 | accepted | 2026-10-07 | PR #13, `417588b` |
 | P0001-C06 | D5 (`config.save`, `d`) | accepted | 2026-10-07 | PR #15, `e688e0b` |
 | P0001-C07 | D5 (the `,` screen; #12, #16); project completion evidence | accepted with follow-ups | 2026-10-07 | PR #17, `120d1c2` |
-| P0001-C08 | D6 (#20); project completion's manual run repeated | accepted | 2026-10-07 | PR #22 (squash SHA added at closeout) |
+| P0001-C08 | D6 (#20); project completion's manual run repeated | accepted | 2026-10-07 | PR #22, `4d982ba` |
 
 ## 8. Closeout
 
-Fill this only when completing or abandoning the project.
-
-- **Outcome:** —
-- **Accepted chunks:** —
-- **Changelog entries:** —
-- **Derived release effect:** —
-- **Unfinished or deliberately excluded:** —
-- **Decisions added or reopened:** —
+- **Outcome:** complete. Everything `strings_aupif.py` does has a `jumble`
+  or TUI route (parity table in `docs/chunks/P0001-C07.md`, *Completion
+  evidence*), except the two features §2 excluded; settings persist in the
+  §5 settings file, saved from the TUI with `d` or `,`. Completion evidence:
+  parity, spec coverage, and README/help/spec agreement in P0001-C07's
+  *Completion evidence*; the real-terminal run there and repeated in
+  P0001-C08's review; `make check` green on `master` at `4d982ba` (CI run
+  37639789219).
+- **Accepted chunks:** P0001-C01 – P0001-C08 (PRs #7, #9, #10, #11, #13,
+  #15, #17, #22).
+- **Changelog entries:** release-please reads these squash commits on
+  `master`; each type fits its chunk's user-visible effect, and the two
+  breaking changes are marked, so no `BEGIN_COMMIT_OVERRIDE` is needed:
+  - `5453b64` `feat!: settings model, all character sets, and generation
+    options` (wider `symbols` and `-a`, DEC-2, DEC-3)
+  - `5efd848` `feat(cli): -o, --json, and --strength output options`
+  - `db69003` `feat(tui): layout, live validation, and copy keys`
+  - `11d323c` `feat(tui): save key, starting values, and give-up toast`
+  - `417588b` `feat: read the settings file`
+  - `e688e0b` `feat(tui): save the controls as defaults with d`
+  - `120d1c2` `feat(tui): settings screen on ,`
+  - `4d982ba` `feat(cli)!: bare jumble opens the TUI in a terminal` (DEC-21)
+- **Derived release effect:** minor (breaking changes while below 1.0, per
+  AGENTS.md *Releases*). Evidence only, not a target version. The Release
+  workflow still fails to open its pull request (#8), so no release can be
+  cut until that is fixed.
+- **Unfinished or deliberately excluded:** the §2 non-goals; multi-code-point
+  emoji (#5); each set's characters in the TUI (#18); the settings screen's
+  buttons when the path wraps (#19); `pytest -s` exiting 1 after
+  `test_unwritable_stdout` (#23); release-please's failing workflow (#8).
+- **Decisions added or reopened:** DEC-2 – DEC-21 added (DEC-2 – DEC-13 at
+  shaping, DEC-14 – DEC-21 during delivery); DEC-1 amended in place at the
+  review of P0001-C01.

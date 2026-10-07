@@ -1,20 +1,18 @@
 # Status
 
-Last updated 2026-10-07 by `relay-next`.
+Last updated 2026-10-07 by `relay-project`.
 Last review: P0001-C08, 2026-10-07.
 
 ## Where this stands
 
 - The relay workflow was set up on 2026-10-06.
-- Project P0001 (full generator) became active on 2026-10-06; its design is in
-  `docs/spec.md` and DEC-2 – DEC-21.
-- D1 – D6 are accepted (P0001-C01 – C08, PRs #7, #9, #10, #11, #13, #15,
-  #17, #22); details in the project ledger. Completion evidence is in
-  `docs/chunks/P0001-C07.md`, with the manual run repeated in
-  P0001-C08's review.
-- What remains of P0001: its closeout and completion audit, including
-  P0001-C08's squash SHA in the ledger.
-- **Do next:** `/relay-project` to close P0001.
+- Project P0001 (full generator) ran from 2026-10-06 to 2026-10-07 and is
+  complete: D1 – D6 accepted in P0001-C01 – C08; closeout in its project
+  file. Its design is in `docs/spec.md` and DEC-2 – DEC-21.
+- No project is active. Open follow-ups are issues (#5, #8, #18, #19, #23).
+- **Do next:** fix release-please (#8) before cutting a release, then pick
+  the next work: `/relay-next` for a standalone fix from an issue, or
+  `/relay-project` for a new project.
 
 ## In flight
 
