@@ -128,9 +128,19 @@ upper bound and is reported as such (DEC-7).
 ## 4. Command line
 
 ```text
+jumble                    in a terminal, open the TUI (§7); otherwise as below
 jumble [options]          generate and print strings
 jumble [options] tui      open the TUI, starting from these options (§7)
 ```
+
+`jumble` with no arguments at all opens the TUI, exactly as `jumble tui`
+does (§7.5), when its standard input and its standard output are both
+terminals. When either is not (`jumble | pbcopy`, `$(jumble)`, a script, a
+cron job), it prints as `jumble [options]` does with no options. Any argument
+at all, `--no-config` or `-c 1` included, means `jumble [options]`, which
+always prints; `jumble [options] tui` always opens the TUI. The arguments are
+the ones `main` is given, or `sys.argv[1:]` when it is given none, the same
+list argparse parses (DEC-21).
 
 | Option | Setting / effect |
 |---|---|
@@ -365,6 +375,9 @@ The TUI follows corral's layout and habits: a one-line header, a controls pane
 beside a results pane, an error banner shown only when needed, toasts for
 outcomes, single-key actions listed in the footer, and the same behavior code
 as the command line (`jumble.generate`).
+
+It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
+`jumble` in a terminal (§4, DEC-21).
 
 ### 7.1 Layout
 

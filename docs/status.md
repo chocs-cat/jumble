@@ -7,20 +7,20 @@ Last review: P0001-C07, 2026-10-07.
 
 - The relay workflow was set up on 2026-10-06.
 - Project P0001 (full generator) became active on 2026-10-06; its design is in
-  `docs/spec.md` and DEC-2 – DEC-20.
+  `docs/spec.md` and DEC-2 – DEC-21.
 - D1 – D5 are accepted (P0001-C01 – C07, PRs #7, #9, #10, #11, #13, #15,
   #17); details in the project ledger. P0001-C07 also gathered the
-  project's completion evidence (parity, spec coverage, agreement, a
-  real-terminal run), in `docs/chunks/P0001-C07.md`.
-- What remains of P0001: its closeout (the completion audit against
-  project §6, `make check` on `master`, the changelog check, and
-  *Closeout*). No chunk is cut.
-- **Do next:** `/relay-project` to close P0001.
+  project's completion evidence, in `docs/chunks/P0001-C07.md`.
+- D6 (bare `jumble` opens the TUI, #20, DEC-21) was added at the user's
+  request after D5. P0001-C08 was cut for it on 2026-10-07 and is ready
+  for an executor.
+- What remains of P0001: D6, then its closeout by `/relay-project`.
+- **Do next:** `/relay-execute` to build P0001-C08.
 
 ## In flight
 
-- **Chunk:** —
-- **State:** none
+- **Chunk:** P0001-C08
+- **State:** ready for an executor
 - **Branch:** —
 - **Pull request:** —
 - **Units committed:** —
@@ -49,4 +49,4 @@ One line per chunk: the decision-log IDs it added.
 - P0001-C04: none (DEC-17 added at the cut of P0001-C05).
 - P0001-C05: none (DEC-18 added at its review).
 - P0001-C06: DEC-19 (DEC-20 added at the cut of P0001-C07).
-- P0001-C07: none.
+- P0001-C07: none (DEC-21 added at the cut of P0001-C08).
