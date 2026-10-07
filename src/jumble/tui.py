@@ -192,7 +192,7 @@ class JumbleApp(App[None]):
     CSS = """
     #error { display: none; background: $error; color: $text; padding: 0 1; }
     #error.shown { display: block; }
-    #controls { width: 50; border-right: solid $panel; }
+    #controls { width: 54; border-right: solid $panel; }
     SettingsScreen { align: center middle; }
     #dialog { width: 58; height: auto; max-height: 100%; border: thick $primary; padding: 0 1; }
     #form { height: auto; }

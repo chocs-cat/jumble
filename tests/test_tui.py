@@ -8,7 +8,9 @@ from typing import Any
 
 import pytest
 from textual.app import App
+from textual.geometry import Region
 from textual.pilot import Pilot
+from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Input, OptionList, SelectionList, Static
 
 from jumble import tui
@@ -1052,3 +1054,30 @@ async def test_the_save_button_is_a_button() -> None:
         await open_settings(pilot)
         assert str(app.screen.query_one("#save", Button).label) == "Save"
         assert str(app.screen.query_one("#cancel", Button).label) == "Cancel"
+
+
+# Every label shows whole at 100 by 30, `One from each set` included (§7.1, #12).
+
+
+def rendered(widget: Widget) -> str:
+    """The text `widget` draws in its region, its border included."""
+    size = widget.region
+    return "\n".join(s.text for s in widget.render_lines(Region(0, 0, size.width, size.height)))
+
+
+LABELS = [(f"#{wid}", label) for wid, label, _ in tui.OPTIONS] + [
+    ("#length", "Length"),
+    ("#count", "Count"),
+    ("#charsets", "Sets"),
+    ("#custom", "Custom"),
+]
+
+
+async def test_every_label_shows_whole() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        for screen in (app.screen, await open_settings(pilot)):
+            for selector, label in LABELS:
+                text = rendered(screen.query_one(selector))
+                assert label in text, selector
+                assert "…" not in text, selector
