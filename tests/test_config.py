@@ -7,7 +7,7 @@ import pytest
 import tomlkit
 from tomlkit.exceptions import KeyAlreadyPresent
 
-from jumble.config import TEMPLATE, config_path, load, save
+from jumble.config import TEMPLATE, config_path, file_settings, load, save
 from jumble.generate import JumbleError, Settings, settings_dict
 
 # config_path tests set the variables themselves; load tests take paths.
@@ -439,3 +439,21 @@ def test_save_path_is_shown_as_given(tmp_path: Path, monkeypatch: pytest.MonkeyP
     Path("rel.toml").mkdir()
     # As pathlib writes it: no leading `./`, not made absolute (§5.1).
     assert save_error(Path("./rel.toml")) == "can't save rel.toml: Is a directory"
+
+
+# file_settings: the file over the built-in defaults, as §5.2 merges them.
+
+
+@pytest.mark.parametrize(
+    ("file", "expected"),
+    [
+        ({}, Settings()),
+        ({"charsets": []}, Settings()),
+        ({"custom": ""}, Settings()),
+        ({"length": 24, "custom": "abc"}, Settings(length=24, charsets=(), custom="abc")),
+        ({"charsets": ["digits"]}, Settings(charsets=("digits",))),
+        ({"each": True, "count": 3}, Settings(count=3, each=True)),
+    ],
+)
+def test_file_settings(file: dict[str, Any], expected: Settings) -> None:
+    assert file_settings(file) == expected

@@ -5,8 +5,10 @@ Section numbers below refer to the spec.
 
 import os
 import tomllib
-from dataclasses import fields
+from collections.abc import Mapping
+from dataclasses import fields, replace
 from pathlib import Path
+from typing import Any
 
 import tomlkit
 from tomlkit.exceptions import TOMLKitError
@@ -79,6 +81,26 @@ def load(path: Path) -> dict[str, object]:
         except JumbleError as e:
             raise JumbleError(f"{path}: {key}: {e}") from e
     return table
+
+
+def file_settings(file: Mapping[str, Any]) -> Settings:
+    """The built-in defaults, then `file`'s keys, merged as §5.2 merges them (DEC-9).
+
+    `file` is what `load` returned, or `{}`. `length`, `count`, and the four
+    options go key by key. The characters go as a whole: a file that sets
+    `charsets` or `custom` chooses with both, so `custom = "abc"` alone
+    chooses no named set; the default sets apply only when neither chooses
+    any. `cli.settings_from` lays the command line over the file and merges
+    through here, and the settings screen fills its form from this (§7.4).
+    """
+    defaults = Settings()
+    values = {key: file[key] for key in NAMES if key in file}
+    charsets = tuple(values.pop("charsets", ()))
+    custom = values.pop("custom", "")
+    if not charsets and not custom:
+        # Nothing chose any characters, so the default sets apply (§1, DEC-9).
+        charsets = defaults.charsets
+    return replace(defaults, **values, charsets=charsets, custom=custom)
 
 
 # A new file starts from this, with the saved values in place of these

@@ -152,12 +152,19 @@ least 1`, even when the command line overrides that key; fix the file or pass
 instead: `each = true` is fine in the file until `-n 2` asks for two
 characters from three sets.
 
-The TUI's `d` key writes the file: it saves the controls as they stand,
-changes only the values that differ, and keeps the file's comments and
-layout. With no file yet, it writes a commented template listing every key.
-A broken file is repaired by saving over it: unknown keys are dropped, bad
-values replaced, and a file that isn't TOML at all starts over from the
-template.
+The TUI writes the file two ways. Its `d` key saves the controls as they
+stand. Its `,` key opens a settings screen: a form with every setting,
+filled from the file as the command line reads it with no options (the
+built-in defaults where the file says nothing), and the file's path. Save
+writes the form to the file and sets the TUI's controls to it; Cancel or
+`escape` leaves both as they were. Either way, a save changes only the
+values that differ and keeps the file's comments and layout. With no file
+yet, it writes a commented template listing every key.
+
+A broken file is repaired by saving over it: the settings screen opens on
+the built-in defaults with the error in a toast, and Save drops unknown
+keys, replaces bad values, and starts a file that isn't TOML at all over
+from the template.
 
 ### The TUI
 
@@ -165,9 +172,9 @@ template.
 file, like the command line, and options given before `tui` override it:
 `jumble -n 32 -s digits tui` opens on 32-digit strings. A broken settings file
 doesn't stop the TUI: it opens from the built-in defaults and those options,
-with the error in a toast, and `d` saves over it. An unknown set name is an
-error before the TUI opens; any other value it can't use (`-n 0`) opens it
-with the banner showing, to fix there.
+with the error in a toast, and `d` or the settings screen saves over it. An
+unknown set name is an error before the TUI opens; any other value it can't
+use (`-n 0`) opens it with the banner showing, to fix there.
 
 On the left are the controls: length and count, every character set in the
 table above to check or uncheck, custom characters, and the four options (No
@@ -189,11 +196,17 @@ The keys are listed in the footer:
 | `a` | copy all strings, one per line |
 | `s` | save all strings to a new file, `jumble-<epoch>-<count>.txt`, in the current directory |
 | `d` | save the current controls as the defaults, in the settings file (not while the banner shows) |
+| `,` | open the settings screen, to edit the settings file |
 | `q` | quit |
 
 Focus starts on the strings, so the keys work. In a text box, `enter`
 jumbles (as `g` does) and returns to the strings, and `escape` returns without
 jumbling. While the banner shows, `c`, `a`, and `s` use the last batch.
+
+The keys above don't act while the settings screen is open. In its text
+boxes `enter` saves, as its Save button does. Save checks the form as the
+banner would, and while it can't produce strings, saves nothing and says
+why. A save doesn't jumble: the strings stay until the next `g`.
 
 `s` never overwrites: if the file exists (a second save in the same second),
 it saves nothing and says so. The file holds the same bytes as `jumble`'s

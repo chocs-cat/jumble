@@ -5,10 +5,9 @@ import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
 from typing import Any
 
-from jumble.config import config_path, load
+from jumble.config import config_path, file_settings, load
 from jumble.generate import (
     CHARSETS,
     LOOK_ALIKES,
@@ -117,9 +116,11 @@ def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings
     option counts when it is given, even at its default value, and a flag
     only turns its option on. The characters go as a whole: `-s` or
     `--custom` (even `--custom ''`) replaces both of the file's `charsets` and
-    `custom`. The default sets apply only when no level chose any.
+    `custom`. The default sets apply only when no level chose any. The
+    command line is laid over the file's keys and merged by
+    `config.file_settings`, so there is one merge.
     """
-    values = {key: file[key] for key in ("length", "count", *BOOLEANS) if key in file}
+    values = dict(file)
     for key in ("length", "count"):
         if getattr(args, key) is not None:
             values[key] = getattr(args, key)
@@ -128,13 +129,8 @@ def settings_from(args: argparse.Namespace, file: Mapping[str, Any]) -> Settings
             values[key] = True
     names = tuple(name for value in args.charset for name in value.split(","))
     if names or args.custom is not None:
-        charsets, custom = names, args.custom or ""
-    else:
-        charsets, custom = tuple(file.get("charsets", ())), file.get("custom", "")
-    if not charsets and not custom:
-        # Nothing chose any characters, so the default sets apply (§1, DEC-9).
-        charsets = DEFAULTS.charsets
-    return replace(DEFAULTS, **values, charsets=charsets, custom=custom)
+        values["charsets"], values["custom"] = names, args.custom or ""
+    return file_settings(values)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
