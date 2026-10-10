@@ -225,3 +225,6 @@ __marimo__/
 
 # Machine-specific agent notes
 CLAUDE.local.md
+
+# Relay workflow process files: local, never committed.
+/.relay/
