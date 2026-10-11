@@ -6,19 +6,22 @@ from collections.abc import Iterator
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
+from textual import events
 from textual.app import App
+from textual.containers import VerticalScroll
 from textual.geometry import Region
 from textual.pilot import Pilot
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, OptionList, SelectionList, Static
+from textual.widgets import Button, Checkbox, Footer, Input, OptionList, SelectionList, Static
 
 from jumble import tui
 from jumble.cli import main, parser, settings_from
 from jumble.config import file_settings, load
 from jumble.generate import CHARSETS, JumbleError, Settings, settings_dict, strength, strength_line
-from jumble.tui import JumbleApp, SettingsScreen, characters, read_controls
+from jumble.tui import HelpScreen, JumbleApp, SettingsScreen, characters, read_controls
 
 
 def results(app: JumbleApp) -> list[str]:
@@ -339,6 +342,7 @@ async def test_footer_keys() -> None:
             ("s", "Save"),
             ("d", "Save defaults"),
             ("comma", "Settings"),
+            ("question_mark", "Help"),
             ("q", "Quit"),
         ]
         comma = next(a.binding for a in bindings if a.binding.key == "comma")
@@ -1290,3 +1294,246 @@ async def test_the_controls_fit_with_the_preview() -> None:
         for selector in ["#length", "#count", "#charsets", "#preview", "#custom", *options]:
             assert pane.region.contains_region(app.query_one(selector).region), selector
         assert pane.max_scroll_y == 0
+
+
+# Help shows §2.1's sets and §7.6's notes, independently of the current alphabet.
+HELP_HEADINGS = [
+    "lower · 26 characters",
+    "upper · 26 characters",
+    "digits · 10 characters",
+    "symbols · 32 characters",
+    "space · 1 character",
+    "chess · 12 characters",
+    "cards · 52 characters",
+    "dice · 6 characters",
+    "emoji-faces · 80 characters",
+    "emoji-animals · 63 characters",
+    "emoji-food · 55 characters",
+    "greek · 48 characters",
+    "cyrillic · 64 characters",
+    "latin-accented · 62 characters",
+    "arrows · 10 characters",
+    "math · 26 characters",
+    "currency · 12 characters",
+    "box · 160 characters",
+]
+HELP_NOTES = [
+    "Length: characters per string, at least 1",
+    "Count: how many strings, at least 1",
+    "Custom: extra characters, drawn as one more set",
+    "No look-alikes: leave out 0 O o l 1 I | ` ' \" ; : . , -",
+    "One from each set: at least one character from every chosen set",
+    "No repeats: no character twice within a string",
+    "All unique: no string twice in the output",
+]
+
+
+async def open_help(pilot: Pilot[None]) -> HelpScreen:
+    await pilot.press("?")
+    await pilot.pause()
+    assert isinstance(pilot.app.screen, HelpScreen)
+    return pilot.app.screen
+
+
+def main_snapshot(app: JumbleApp) -> tuple[object, ...]:
+    """Everything Help must leave alone (§7.6), including both cursors."""
+    return (
+        app.settings(),
+        list(app.strings),
+        results(app),
+        app.query_one("#results", OptionList).highlighted,
+        banner(app),
+        app.problem,
+        app.valid,
+        app.sub_title,
+        preview(app.main),
+        app.query_one("#charsets", SelectionList).highlighted,
+    )
+
+
+async def test_help_lists_every_set_and_control_note() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert app.focused is app.query_one("#results")
+        footer = "".join(rendered(w) for w in app.query_one(Footer).query(Widget))
+        assert "? Help" in footer
+        screen = await open_help(pilot)
+        assert screen.query_one("#help-content").border_title == "Help"
+        headings = list(screen.query(".set-heading").results(Static))
+        bodies = list(screen.query(".set-body").results(Static))
+        notes = list(screen.query(".control-note").results(Static))
+        assert [str(w.content) for w in headings] == HELP_HEADINGS
+        assert [str(w.content) for w in bodies] == [characters(name) for name in CHARSETS]
+        assert [str(w.content) for w in notes] == HELP_NOTES
+        # Sets alternate heading/body, with all notes after the last set.
+        children = list(screen.query_one("#help-content").children)
+        assert children == [w for pair in zip(headings, bodies, strict=True) for w in pair] + notes
+        for note, expected in zip(notes, HELP_NOTES, strict=True):
+            note.scroll_visible(animate=False)
+            await pilot.pause()
+            assert screen.query_one("#help-content").content_region.contains_region(note.region)
+            assert " ".join(rendered(note).split()) == expected
+
+
+@pytest.mark.parametrize("name", ["symbols", "space", "emoji-faces", "box"])
+async def test_help_renders_complete_wrapped_bodies(name: str) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await open_help(pilot)
+        body = list(screen.query(".set-body").results(Static))[list(CHARSETS).index(name)]
+        body.scroll_visible(animate=False)
+        await pilot.pause()
+        content = screen.query_one("#help-content")
+        assert content.content_region.contains_region(body.region)
+        drawn = "".join(line.rstrip() for line in rendered(body).splitlines())
+        assert drawn == characters(name)
+        if name in ("emoji-faces", "box"):
+            assert body.region.height > 1
+            assert drawn[-1] == CHARSETS[name][-1]
+
+
+async def test_help_ignores_alphabet_filters() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await check(pilot, "#no-ambiguous")
+        await set_value(pilot, "#custom", "abc")
+        screen = await open_help(pilot)
+        bodies = [str(w.content) for w in screen.query(".set-body").results(Static)]
+        assert bodies == [characters(name) for name in CHARSETS]
+        assert bodies[0] == string.ascii_lowercase
+        assert "l" in bodies[0] and "o" in bodies[0]
+
+
+async def test_help_uses_the_shared_renderer(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        renderer = Mock(side_effect=lambda name: f"rendered {name}")
+        monkeypatch.setattr(tui, "characters", renderer)
+        screen = await open_help(pilot)
+        assert [call.args for call in renderer.call_args_list] == [(name,) for name in CHARSETS]
+        assert [str(w.content) for w in screen.query(".set-body").results(Static)] == [
+            f"rendered {name}" for name in CHARSETS
+        ]
+
+
+@pytest.mark.parametrize("key", ["escape", "?"])
+async def test_closing_help_preserves_the_main_screen(key: str) -> None:
+    app = JumbleApp(Settings(count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        sets = app.query_one("#charsets", SelectionList)
+        sets.highlighted = list(CHARSETS).index("greek")
+        await pilot.pause()
+        await pilot.press("down")
+        assert app.query_one("#results", OptionList).highlighted == 1
+        before = main_snapshot(app)
+        await open_help(pilot)
+        await pilot.press("pagedown")
+        await pilot.press(key)
+        await pilot.pause()
+        assert len(app.screen_stack) == 1
+        assert main_snapshot(app) == before
+
+
+@pytest.mark.parametrize("key", ["g", "c", "a", "s", "d", "comma", "q"])
+async def test_main_actions_are_inert_in_help(
+    key: str, here: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = JumbleApp(Settings(count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("down")
+        assert app.valid and len(app.strings) == 3
+        assert app.query_one("#results", OptionList).highlighted == 1
+        before = main_snapshot(app)
+        # Install after startup, which must generate. Observe effects as well
+        # as state: a leaked jumble is caught even if its strings stay equal.
+        spies = [Mock(wraps=tui.generate), Mock(), Mock(), Mock(), Mock(), Mock()]
+        for target, attr, spy in zip(
+            [tui, app, tui, tui, app, app],
+            ["generate", "copy_to_clipboard", "open", "save", "action_settings", "exit"],
+            spies,
+            strict=True,
+        ):
+            monkeypatch.setattr(target, attr, spy, raising=False)
+        screen = await open_help(pilot)
+        await pilot.press(key)
+        await pilot.pause()
+        for spy in spies:
+            spy.assert_not_called()
+        assert app.screen is screen and app.is_running
+        assert main_snapshot(app) == before
+        assert list(here.iterdir()) == [] and not config_file.exists()
+
+
+@pytest.mark.parametrize("had_results", [False, True])
+async def test_help_opens_with_invalid_controls_and_preserves_results(had_results: bool) -> None:
+    app = JumbleApp(Settings(length=16 if had_results else 0, count=3))
+    async with app.run_test(size=SIZE) as pilot:
+        if had_results:
+            await pilot.press("down")
+            await set_value(pilot, "#length", "0")
+        assert banner(app) == "length must be at least 1"
+        assert bool(app.strings) is had_results
+        before = main_snapshot(app)
+        await open_help(pilot)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert len(app.screen_stack) == 1
+        assert main_snapshot(app) == before
+
+
+async def test_question_mark_is_typed_in_main_and_settings_inputs() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        custom = app.query_one("#custom", Input)
+        custom.focus()
+        await pilot.press("?")
+        assert custom.value == "?"
+        assert len(app.screen_stack) == 1
+        await pilot.press("escape")
+        screen = await open_settings(pilot)
+        form_custom = screen.query_one("#custom", Input)
+        form_custom.focus()
+        await pilot.press("?")
+        assert form_custom.value == "?"
+        assert app.screen is screen and custom.value == "?"
+        # With a non-input focused, Settings has no Help binding either.
+        screen.query_one("#each", Checkbox).focus()
+        await pilot.press("?")
+        assert app.screen is screen
+
+
+async def test_help_scrolls_by_arrows_pages_and_mouse_to_the_last_note() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await open_help(pilot)
+        content = screen.query_one("#help-content", VerticalScroll)
+        assert app.focused is content and content.scroll_y == 0
+        await pilot.press("down")
+        await pilot.wait_for_scheduled_animations()
+        after_down = content.scroll_y
+        assert after_down > 0
+        await pilot.press("pagedown")
+        await pilot.wait_for_scheduled_animations()
+        assert content.scroll_y > after_down
+        await pilot.press("pageup")
+        await pilot.wait_for_scheduled_animations()
+        assert content.scroll_y <= after_down
+        await pilot.press("up")
+        await pilot.wait_for_scheduled_animations()
+        assert content.scroll_y == 0
+        # Deliver a wheel event at the scroll container, as a terminal driver
+        # does; Pilot has no wheel helper in this Textual version.
+        content.post_message(events.MouseScrollDown(content, 3, 3, 0, 0, 0, False, False, False))
+        await pilot.pause()
+        await pilot.wait_for_scheduled_animations()
+        assert content.scroll_y > 0
+        for _ in range(20):
+            await pilot.press("pagedown")
+            await pilot.wait_for_scheduled_animations()
+            if content.scroll_y == content.max_scroll_y:
+                break
+        assert content.scroll_y == content.max_scroll_y
+        note = list(screen.query(".control-note").results(Static))[-1]
+        assert content.content_region.contains_region(note.region)
+        assert "".join(line.rstrip() for line in rendered(note).splitlines()) == HELP_NOTES[-1]

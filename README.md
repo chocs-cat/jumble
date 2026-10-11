@@ -204,11 +204,19 @@ The keys are listed in the footer:
 | `s` | save all strings to a new file, `jumble-<epoch>-<count>.txt`, in the current directory |
 | `d` | save the current controls as the defaults, in the settings file (not while the banner shows) |
 | `,` | open the settings screen, to edit the settings file |
+| `?` | open Help, with every set's characters and notes on the controls |
 | `q` | quit |
 
 Focus starts on the strings, so the keys work. In a text box, `enter`
 jumbles (as `g` does) and returns to the strings, and `escape` returns without
 jumbling. While the banner shows, `c`, `a`, and `s` use the last batch.
+
+`?` opens Help even while the banner shows. It lists every named set's
+characters, unfiltered as in the preview, then notes on the other controls.
+Scroll with the arrow and page keys or the mouse wheel; `escape` or `?`
+closes it. Opening and closing Help leaves the controls and strings alone,
+and the main keys don't act while it's open. In a text box, `?` is typed
+like any other character.
 
 The settings screen shows the file's path in full, wrapped when it's long,
 and keeps Save and Cancel in view: on a short terminal only the form
