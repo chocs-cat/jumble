@@ -128,12 +128,14 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
         self.path = path
 
     def compose(self) -> ComposeResult:
-        # The dialog scrolls as a whole when the terminal is too short for it.
-        with VerticalScroll(id="dialog") as dialog:
+        # The path, wrapped whole, and the buttons always show; the form takes
+        # the rows left between them and scrolls when they are too few (§7.4,
+        # DEC-23).
+        with Vertical(id="dialog") as dialog:
             dialog.border_title = "Settings"
             # A path can hold `[`, so it is shown as text, not markup.
             yield Static(str(self.path), id="path", markup=False)
-            with Vertical(id="form"):
+            with VerticalScroll(id="form"):
                 yield from controls(self.start)
             with Horizontal(id="buttons"):
                 yield Button("Save", id="save", variant="primary")
@@ -195,7 +197,7 @@ class JumbleApp(App[None]):
     #controls { width: 54; border-right: solid $panel; }
     SettingsScreen { align: center middle; }
     #dialog { width: 58; height: auto; max-height: 100%; border: thick $primary; padding: 0 1; }
-    #form { height: auto; }
+    #form { height: 1fr; }
     #path { color: $text-muted; }
     #buttons { height: auto; align-horizontal: right; }
     #buttons Button { margin-left: 1; }
