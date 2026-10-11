@@ -183,7 +183,9 @@ use (`-n 0`) opens it with the banner showing, to fix there.
 
 On the left are the controls: length and count, every character set in the
 table above to check or uncheck, custom characters, and the four options (No
-look-alikes, One from each set, No repeats, All unique). On the right are the
+look-alikes, One from each set, No repeats, All unique). Under the sets, a
+preview shows the characters of the set the list's cursor is on, all of them
+as the set is defined, whatever the options say. On the right are the
 strings, one per row. The header shows the alphabet size and strength for the
 controls as they stand, updated as you change them. When the controls can't
 produce strings, a banner under the header says why, with the same message the
