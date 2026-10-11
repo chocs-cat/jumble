@@ -704,8 +704,8 @@ async def test_the_command_line_reads_what_d_saved(
 
 # `,` opens the settings screen, a form on the settings file (§7.4, DEC-20).
 # Its widgets are reached through `app.screen`: `app.query_one` searches the
-# main screen (AGENTS.md, Testing notes). At 100 by 30 the whole form shows,
-# so its buttons can be clicked without scrolling.
+# main screen (AGENTS.md, Testing notes). Its buttons always show, so they
+# can be clicked at any size the dialog fits (§7.4, DEC-23).
 
 SIZE = (100, 30)
 
@@ -1069,6 +1069,72 @@ async def test_the_save_button_is_a_button() -> None:
         await open_settings(pilot)
         assert str(app.screen.query_one("#save", Button).label) == "Save"
         assert str(app.screen.query_one("#cancel", Button).label) == "Cancel"
+
+
+# The path and the buttons always show; only the form scrolls (§7.4, DEC-23).
+# A widget scrolled out of the form keeps a region outside it, so "in view"
+# is checked against the form's region, and the buttons against the screen's.
+
+
+@pytest.fixture
+def long_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A settings path of 140 characters with no spaces, missing until saved.
+
+    It wraps to three lines at the dialog's width, with or without the
+    form's scrollbar.
+    """
+    head, tail = f"{tmp_path}/", "/config.toml"
+    path = Path(head + "d" * (140 - len(head) - len(tail)) + tail)
+    assert len(str(path)) == 140
+    monkeypatch.setenv("JUMBLE_CONFIG", str(path))
+    return path
+
+
+def path_lines(screen: SettingsScreen) -> list[str]:
+    return [line.rstrip() for line in rendered(screen.query_one("#path")).splitlines()]
+
+
+def regions(screen: SettingsScreen, *selectors: str) -> list[Region]:
+    return [screen.query_one(selector).region for selector in selectors]
+
+
+def buttons_show(app: JumbleApp, screen: SettingsScreen) -> bool:
+    return all(app.screen.region.contains_region(r) for r in regions(screen, "#save", "#cancel"))
+
+
+async def test_a_long_path_shows_whole_above_the_buttons(long_path: Path) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await open_settings(pilot)
+        lines = path_lines(screen)
+        assert len(lines) == 3
+        assert "".join(lines) == str(long_path)
+        assert buttons_show(app, screen)
+        await pilot.click("#save")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert load(long_path) == settings_dict(Settings())
+
+
+async def test_only_the_form_scrolls_on_a_short_terminal(long_path: Path) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=(100, 16)) as pilot:
+        screen = await open_settings(pilot)
+        assert "".join(path_lines(screen)) == str(long_path)
+        assert buttons_show(app, screen)
+        form = screen.query_one("#form")
+        assert form.virtual_size.height > form.region.height
+        pinned = regions(screen, "#path", "#save", "#cancel")
+        for selector in ("#unique", "#length"):
+            screen.query_one(selector).focus()
+            await pilot.pause()
+            await pilot.wait_for_scheduled_animations()
+            assert form.region.contains_region(screen.query_one(selector).region), selector
+            assert regions(screen, "#path", "#save", "#cancel") == pinned, selector
+        await pilot.click("#cancel")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert not long_path.exists()
 
 
 # Every label shows whole at 100 by 30, `One from each set` included (§7.1, #12).
