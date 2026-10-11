@@ -61,7 +61,7 @@ def characters(name: str) -> str:
     nothing between them; `space`, which can't be seen, as a phrase.
 
     Nothing filters it, `no_ambiguous` included: it shows the set, not the
-    alphabet (DEC-22). The set preview uses it, as the help screen will (§7.6).
+    alphabet (DEC-22). Both the set preview and Help use it (§7.6).
     """
     if name == "space":
         return "(the space character)"
@@ -220,6 +220,39 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
         self.dismiss(None)
 
 
+class HelpScreen(ModalScreen[None]):
+    """Every named set and the control notes, without changing the session (§7.6)."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("escape,question_mark", "close", show=False),
+    ]
+    # Override the App's results selector: this scroll container must receive
+    # the arrow/page keys. ModalScreen isolates the main bindings (DEC-20).
+    AUTO_FOCUS = "#help-content"
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(id="help-content") as dialog:
+            dialog.border_title = "Help"
+            for name, chars in CHARSETS.items():
+                unit = "character" if len(chars) == 1 else "characters"
+                yield Static(f"{name} · {len(chars)} {unit}", classes="set-heading")
+                yield Static(characters(name), classes="set-body", markup=False)
+            # Exact control notes and look-alikes from §7.6 and §3.1.
+            for note in (
+                "Length: characters per string, at least 1",
+                "Count: how many strings, at least 1",
+                "Custom: extra characters, drawn as one more set",
+                "No look-alikes: leave out 0 O o l 1 I | ` ' \" ; : . , -",
+                "One from each set: at least one character from every chosen set",
+                "No repeats: no character twice within a string",
+                "All unique: no string twice in the output",
+            ):
+                yield Static(note, classes="control-note", markup=False)
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
 class JumbleApp(App[None]):
     # The results pane holds focus so letter keys reach the bindings (DEC-12).
     AUTO_FOCUS = "#results"
@@ -228,6 +261,10 @@ class JumbleApp(App[None]):
     #error.shown { display: block; }
     #controls { width: 54; border-right: solid $panel; }
     SettingsScreen { align: center middle; }
+    HelpScreen { align: center middle; }
+    #help-content { width: 58; height: 100%; border: thick $primary; padding: 0 1; }
+    .set-heading { text-style: bold; }
+    .set-body { margin-bottom: 1; }
     #dialog { width: 58; height: auto; max-height: 100%; border: thick $primary; padding: 0 1; }
     #form { height: 1fr; }
     #path { color: $text-muted; }
@@ -248,6 +285,7 @@ class JumbleApp(App[None]):
         ("s", "save", "Save"),
         ("d", "save_defaults", "Save defaults"),
         ("comma", "settings", "Settings"),
+        Binding("question_mark", "help", "Help", key_display="?"),
         ("q", "quit", "Quit"),
         Binding("escape", "focus_results", show=False),
     ]
@@ -426,6 +464,10 @@ class JumbleApp(App[None]):
             start = DEFAULTS
             self.notify(str(e), severity="error")
         self.push_screen(SettingsScreen(start, path), self.saved)
+
+    def action_help(self) -> None:
+        """Open Help even with invalid controls (§7.6, DEC-22)."""
+        self.push_screen(HelpScreen())
 
     def saved(self, result: tuple[Settings, Path] | None) -> None:
         """After the settings screen: set the controls to what it saved (§7.4)."""
