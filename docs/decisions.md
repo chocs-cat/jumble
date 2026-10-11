@@ -289,3 +289,31 @@ Added at the cut of P0001-C08, from issue #20.
 
 *Where:* docs/spec.md §4, §7.
 
+## DEC-22: The TUI shows a set's characters in a preview and a help screen (2026-10)
+
+The TUI listed only set names, and with 18 sets, several of them Unicode
+ranges, a name like `box` or `math` doesn't say what it draws (issue #18;
+`strings_aupif.py` had a help panel for this). So a preview under the Sets
+list shows the set under the list's cursor, with no key to press, and `?`
+opens a help screen listing every set with its characters, and a note on each
+other control, for reading them all at once. Both show the set as §2.1
+defines it, whatever the other controls are: filtering it by `no_ambiguous`
+or by overlaps with other chosen sets would make the preview change when an
+unrelated control does, and the subtitle already reports the alphabet those
+filters leave. Ruled out: tooltips (they need a mouse), a sample in each
+list row (160 characters don't fit a 54-column pane), and the help screen
+alone (a key press to learn what the cursor is already on). Added 2026-10-11, from issue #18.
+
+*Where:* docs/spec.md §7.1, §7.2, §7.6.
+
+## DEC-23: The settings screen pins its path and buttons (2026-10)
+
+The settings dialog scrolled as a whole, so a path that wrapped pushed Save
+and Cancel below the fold (issue #19), and the set preview (DEC-22) makes
+the form taller still. Now the path and the buttons always show and only the
+form scrolls. Cutting the path short from the left, to keep it on one line,
+was the alternative; the path is the one thing the screen shows that the
+main screen doesn't, and two deep paths can differ only in the part cut
+away. Added 2026-10-11, from issue #19.
+
+*Where:* docs/spec.md §7.4.
