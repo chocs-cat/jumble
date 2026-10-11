@@ -1,5 +1,6 @@
 import errno
 import json
+import string
 import time
 from collections.abc import Iterator
 from importlib.metadata import version
@@ -17,7 +18,7 @@ from jumble import tui
 from jumble.cli import main, parser, settings_from
 from jumble.config import file_settings, load
 from jumble.generate import CHARSETS, JumbleError, Settings, settings_dict, strength, strength_line
-from jumble.tui import JumbleApp, SettingsScreen, read_controls
+from jumble.tui import JumbleApp, SettingsScreen, characters, read_controls
 
 
 def results(app: JumbleApp) -> list[str]:
@@ -1162,3 +1163,130 @@ async def test_every_label_shows_whole() -> None:
                 text = rendered(screen.query_one(selector))
                 assert label in text, selector
                 assert "…" not in text, selector
+
+
+# Under the Sets list, a preview shows the set under that list's cursor, as
+# §2.1 defines it; the form has its own, following its own list (§7.6,
+# DEC-22).
+
+PREVIEWED = ("symbols", "space", "emoji-faces", "greek")
+
+
+def preview(node: Any) -> str:
+    """The preview's text under `node` as it draws, its wrapped lines joined."""
+    return "".join(line.rstrip() for line in rendered(node.query_one("#preview")).splitlines())
+
+
+def test_characters_are_the_set_as_defined() -> None:
+    for name, chars in CHARSETS.items():
+        assert characters(name) == ("(the space character)" if name == "space" else chars), name
+
+
+async def move_to(pilot: Pilot[None], sets: SelectionList[str], name: str) -> None:
+    """Move `sets`' cursor to `name` by key; it is focused, and `name` is below it."""
+    target = list(CHARSETS).index(name)
+    while sets.highlighted != target:
+        await pilot.press("down")
+    await pilot.pause()
+
+
+async def test_the_preview_starts_on_lower() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE):
+        assert app.query_one("#charsets", SelectionList).highlighted == 0
+        assert preview(app.screen) == string.ascii_lowercase
+
+
+async def test_the_preview_follows_the_cursor_by_key() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        sets = app.query_one("#charsets", SelectionList)
+        sets.focus()
+        for name in PREVIEWED:
+            await move_to(pilot, sets, name)
+            assert preview(app.screen) == characters(name), name
+            if name == "symbols":
+                # Text, not markup: `[` and `\` show as themselves.
+                assert preview(app.screen) == string.punctuation
+        await pilot.press("end")
+        await pilot.pause()
+        assert preview(app.screen) == characters("box")
+
+
+async def test_four_lines_hold_the_largest_sets() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        sets = app.query_one("#charsets", SelectionList)
+        shown = app.query_one("#preview", Static)
+        for name in ("emoji-faces", "box"):
+            sets.highlighted = list(CHARSETS).index(name)
+            await pilot.pause()
+            lines = rendered(shown).splitlines()
+            assert shown.region.height == 4, name
+            assert len(lines) == 4, name
+            # The fourth line holds the last of the set: nothing is cut.
+            assert lines[3].strip(), name
+            assert preview(app.screen) == CHARSETS[name], name
+
+
+async def test_the_preview_follows_a_click() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        # Row 0 is the list's border, so row k + 1 is set k.
+        await pilot.click("#charsets", offset=(4, 3))
+        await pilot.pause()
+        assert app.query_one("#charsets", SelectionList).highlighted == 2
+        assert preview(app.screen) == characters("digits")
+
+
+async def test_the_preview_ignores_the_other_controls() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        await check(pilot, "#no-ambiguous")
+        await set_value(pilot, "#custom", "abc")
+        # `l` and `o` are look-alikes, but the preview shows the set (DEC-22).
+        assert preview(app.screen) == string.ascii_lowercase
+
+
+async def test_checking_a_set_keeps_the_preview() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        sets = app.query_one("#charsets", SelectionList)
+        sets.focus()
+        await move_to(pilot, sets, "greek")
+        for checked in (True, False):
+            await pilot.press("space")
+            await pilot.pause()
+            assert ("greek" in sets.selected) is checked
+            assert sets.highlighted == list(CHARSETS).index("greek")
+            assert preview(app.screen) == characters("greek")
+
+
+async def test_the_form_has_its_own_preview() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        sets = app.query_one("#charsets", SelectionList)
+        sets.focus()
+        await move_to(pilot, sets, "greek")
+        screen = await open_settings(pilot)
+        assert preview(screen) == string.ascii_lowercase
+        form_sets = screen.query_one("#charsets", SelectionList)
+        form_sets.focus()
+        await move_to(pilot, form_sets, "upper")
+        assert preview(screen) == string.ascii_uppercase
+        # The form's cursor never moves the main screen's preview.
+        assert preview(app.main) == characters("greek")
+        await pilot.click("#cancel")
+        await pilot.pause()
+        assert settings_screens(app) == 0
+        assert preview(app.screen) == characters("greek")
+
+
+async def test_the_controls_fit_with_the_preview() -> None:
+    app = JumbleApp()
+    async with app.run_test(size=SIZE):
+        pane = app.query_one("#controls")
+        options = [f"#{wid}" for wid, _, _ in tui.OPTIONS]
+        for selector in ["#length", "#count", "#charsets", "#preview", "#custom", *options]:
+            assert pane.region.contains_region(app.query_one(selector).region), selector
+        assert pane.max_scroll_y == 0
