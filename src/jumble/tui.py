@@ -56,9 +56,25 @@ def titled(widget: Widget, title: str) -> Widget:
     return widget
 
 
+def characters(name: str) -> str:
+    """Set `name`'s characters for display (§7.6): every one, in §2.1's order,
+    nothing between them; `space`, which can't be seen, as a phrase.
+
+    Nothing filters it, `no_ambiguous` included: it shows the set, not the
+    alphabet (DEC-22). The set preview uses it, as the help screen will (§7.6).
+    """
+    if name == "space":
+        return "(the space character)"
+    return CHARSETS[name]
+
+
 def controls(start: Settings) -> list[Widget]:
     """The controls of §7.1, holding `start` as given: the main screen's pane and
-    the settings screen's form are both built here, so they match (§7.4)."""
+    the settings screen's form are both built here, so they match (§7.4).
+
+    Under the Sets list, the preview shows the set under its cursor, which
+    starts on the first set (§7.6).
+    """
     return [
         Horizontal(
             titled(Input(str(start.length), id="length", type="integer"), "Length"),
@@ -71,6 +87,8 @@ def controls(start: Settings) -> list[Widget]:
             ),
             "Sets",
         ),
+        # Sets can hold `[` and `\`, so the preview is text, not markup.
+        Static(characters(next(iter(CHARSETS))), id="preview", markup=False),
         titled(Input(start.custom, id="custom"), "Custom"),
         Grid(
             *(Checkbox(label, getattr(start, setting), id=wid) for wid, label, setting in OPTIONS),
@@ -104,6 +122,11 @@ def set_controls(node: DOMNode, settings: Settings) -> None:
     node.query_one("#custom", Input).value = settings.custom
     for wid, _, setting in OPTIONS:
         node.query_one(f"#{wid}", Checkbox).value = getattr(settings, setting)
+
+
+def show_highlighted(node: DOMNode, event: SelectionList.SelectionHighlighted) -> None:
+    """Show the set under the cursor of the Sets list under `node` in its preview (§7.6)."""
+    node.query_one("#preview", Static).update(characters(event.selection.value))
 
 
 class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
@@ -141,8 +164,9 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
                 yield Button("Save", id="save", variant="primary")
                 yield Button("Cancel", id="cancel")
 
-    # The App's handlers would check the main screen's controls, and `enter`
-    # would jumble there (§7.2): the form's messages go no further than here.
+    # The App's handlers would check the main screen's controls, move its
+    # preview, and `enter` would jumble there (§7.2, §7.6): the form's
+    # messages go no further than here.
 
     def on_input_changed(self, event: Input.Changed) -> None:
         event.stop()
@@ -152,6 +176,14 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
 
     def on_selection_list_selected_changed(self, event: SelectionList.SelectedChanged) -> None:
         event.stop()
+
+    def on_selection_list_selection_highlighted(
+        self, event: SelectionList.SelectionHighlighted
+    ) -> None:
+        # The form's preview follows the form's list, and never moves the main
+        # screen's (§7.6).
+        event.stop()
+        show_highlighted(self, event)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         # `enter` in a form input saves, as the Save button does (§7.4).
@@ -204,6 +236,7 @@ class JumbleApp(App[None]):
     #numbers { height: auto; }
     #numbers Input { width: 1fr; }
     #charsets { height: 12; }
+    #preview { height: 4; }
     #options { grid-size: 2; height: auto; }
     #options Checkbox { width: 1fr; }
     #results { width: 1fr; height: 1fr; border: none; }
@@ -286,6 +319,12 @@ class JumbleApp(App[None]):
 
     def on_selection_list_selected_changed(self) -> None:
         self.check()
+
+    def on_selection_list_selection_highlighted(
+        self, event: SelectionList.SelectionHighlighted
+    ) -> None:
+        # The settings screen stops its form's, so this is the main screen's list.
+        show_highlighted(self.main, event)
 
     def on_input_submitted(self) -> None:
         # `enter` in an input jumbles, as `g` would, and leaves the input (§7.2, DEC-12).
