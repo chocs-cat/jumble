@@ -208,7 +208,9 @@ Focus starts on the strings, so the keys work. In a text box, `enter`
 jumbles (as `g` does) and returns to the strings, and `escape` returns without
 jumbling. While the banner shows, `c`, `a`, and `s` use the last batch.
 
-The keys above don't act while the settings screen is open. In its text
+The settings screen shows the file's path in full, wrapped when it's long,
+and keeps Save and Cancel in view: on a short terminal only the form
+scrolls. The keys above don't act while it's open. In its text
 boxes `enter` saves, as its Save button does. Save checks the form as the
 banner would, and while it can't produce strings, saves nothing and says
 why. A save doesn't jumble: the strings stay until the next `g`.
