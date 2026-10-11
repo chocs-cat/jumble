@@ -386,11 +386,14 @@ It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
  length must be at least 1                                   ← error banner, only when invalid
  Length [16      ]  Count [10    ]   │ aB3dE9fGh2JkLmN4
  Sets                                │ pQ7rStUvW8xYz3Ab
-  [x] lower   [ ] chess  …           │ …
+  [x] lower                          │ …
+  [ ] greek  …                       │
+ ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθ    │   ← set preview (§7.6)
+ ικλμνξοπρστυφχψω                    │
  Custom [                ]           │
  [ ] No look-alikes  [ ] One from each set
  [ ] No repeats      [ ] All unique  │
- g Jumble  c Copy  a Copy all  s Save  d Save defaults  , Settings  q Quit
+ g Jumble  c Copy  a Copy all  s Save  d Save defaults  , Settings  ? Help  q Quit
 ```
 
 - Header: the title `jumble <version>`, the installed package's version
@@ -398,8 +401,9 @@ It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
   the §4.3 line (`strength_line`) for the current controls, updated on every
   change to any control. Textual's header joins them with its own ` — `.
 - Controls pane: length and count inputs, a scrollable list of every named
-  set in canonical order to check or uncheck, the custom-characters input, and
-  the four options as checkboxes. A length or count input that doesn't parse
+  set in canonical order to check or uncheck, the preview of the set under
+  that list's cursor (§7.6), the custom-characters input, and the four
+  options as checkboxes. A length or count input that doesn't parse
   as an integer (empty, or `-` alone) counts as 0, so it shows §6's
   `at least 1` message. In a terminal of 100 columns by 30 rows, every
   control's label shows whole, `One from each set` included (issue #12).
@@ -426,6 +430,7 @@ It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
 | `s` | save all strings to a new file (§7.3) |
 | `d` | save the current controls as the defaults (§7.4) |
 | `,` | open the settings screen (§7.4) |
+| `?` | open the help screen (§7.6) |
 | `q` | quit |
 
 Until a jumble has produced strings (the TUI can start with invalid
@@ -485,6 +490,12 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
     through a successful Save.
   - Focus starts on the form's first control, the Length input. Its only
     key of its own is `escape`.
+  - The screen is a dialog titled `Settings` holding, from the top, the
+    path, the form, and Save and Cancel. The path is shown whole, wrapped
+    onto as many lines as it needs when it is wider than the dialog, never
+    cut short. The path and the buttons always show: when the terminal is
+    too short for the whole dialog, only the form scrolls, so Save and
+    Cancel never need a scroll to reach (DEC-23).
 
 Either route writes to the §5.1 path as it resolves at the time of the save,
 even when the TUI was started with `--no-config`. A successful save's toast
@@ -507,3 +518,41 @@ or empty `-s` name is §6's `unknown character set: 'NAME'`, exit 2, naming the
 first such name as given. Any other invalid starting value starts the TUI with
 the error banner shown and no strings, so `c`, `a`, and `s` do nothing until a
 jumble succeeds (§7.2) (DEC-16).
+
+### 7.6 Seeing the sets' characters
+
+Two places show what each named set holds (DEC-22). Both show a set's
+characters the same way: every character of the set as §2.1 defines it, in
+its order, with nothing between them, wrapped at the width they have. The
+other controls change nothing in them: `no_ambiguous` and the other chosen
+sets (§2.4) remove no character, since they describe the set, and the
+subtitle describes the alphabet. `space`, whose one character can't be seen,
+shows `(the space character)` instead.
+
+- **Preview.** Under the Sets list, a preview four lines tall shows the
+  characters of the set under the list's cursor; four lines hold the largest
+  set at the controls pane's width. The cursor starts on the first set,
+  `lower`, and the preview follows it as it moves, by key or by click;
+  checking or unchecking a set doesn't move it. The preview is part of the
+  controls (§7.1), so the settings form has one too, following the form's
+  own list (§7.4). It is text only: it takes no focus and has no keys.
+- **Help screen.** `?` opens it over the main screen: a dialog titled `Help`
+  listing every named set in canonical order, each as its name and size on
+  one line (`greek · 48 characters`, `space · 1 character`) with its
+  characters below, then a note on each other control, one per line:
+
+  ```text
+  Length: characters per string, at least 1
+  Count: how many strings, at least 1
+  Custom: extra characters, drawn as one more set
+  No look-alikes: leave out 0 O o l 1 I | ` ' " ; : . , -
+  One from each set: at least one character from every chosen set
+  No repeats: no character twice within a string
+  All unique: no string twice in the output
+  ```
+
+  The look-alikes are §3.1's, in its order. The dialog scrolls with the
+  arrow and page keys and the mouse wheel. `escape` or `?` closes it; it
+  changes no control, and main-screen keys don't act while it is open, as
+  with the settings screen (DEC-20). `?` works whether or not the controls
+  are valid. In an input, `?` is typed like any other character (§7.2).
