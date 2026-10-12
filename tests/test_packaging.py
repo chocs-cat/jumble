@@ -4,6 +4,8 @@ import json
 import tomllib
 from pathlib import Path
 
+from test_formula import formula
+
 from jumble.cli import DISTRIBUTION
 
 ROOT = Path(__file__).parent.parent
@@ -15,6 +17,7 @@ def toml(name: str) -> dict:
 
 def test_the_distribution_is_jumble_cli() -> None:
     assert toml("pyproject.toml")["project"]["name"] == DISTRIBUTION == "jumble-cli"
+    assert formula.PACKAGE == "jumble-cli"
 
 
 def test_release_please_names_the_distribution() -> None:
