@@ -17,12 +17,12 @@
   ],
   "packages": {
     ".": {
-      "package-name": "jumble",
+      "package-name": "jumble-cli",
       "extra-files": [
         {
           "type": "toml",
           "path": "uv.lock",
-          "jsonpath": "$.package[?(@.name.value=='jumble')].version"
+          "jsonpath": "$.package[?(@.name.value=='jumble-cli')].version"
         }
       ]
     }

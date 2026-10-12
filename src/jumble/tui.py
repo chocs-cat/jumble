@@ -3,7 +3,6 @@
 import contextlib
 import os
 import time
-from importlib.metadata import version
 from pathlib import Path
 from typing import ClassVar
 
@@ -25,6 +24,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
+from jumble.cli import installed_version
 from jumble.config import config_path, file_settings, load, save
 from jumble.generate import CHARSETS, JumbleError, Settings, generate, strength, strength_line
 
@@ -297,7 +297,7 @@ class JumbleApp(App[None]):
         super().__init__()
         self.initial = settings
         self.file_error = file_error
-        self.title = f"jumble {version('jumble')}"
+        self.title = f"jumble {installed_version()}"
         self.strings: list[str] = []
         self.valid = False
         # The banner's §6 message while the controls are invalid (§7.1).

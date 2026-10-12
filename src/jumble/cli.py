@@ -1,6 +1,7 @@
 """The `jumble` command (docs/spec.md §4)."""
 
 import argparse
+import importlib.metadata
 import json
 import os
 import sys
@@ -23,8 +24,16 @@ from jumble.generate import (
 
 DEFAULTS = Settings()
 
+# The PyPI distribution; `jumble` there is someone else's (DEC-24).
+DISTRIBUTION = "jumble-cli"
+
 # The settings a command-line flag can only turn on (§5.2, DEC-9).
 BOOLEANS = ("no_ambiguous", "each", "no_repeat", "unique")
+
+
+def installed_version() -> str:
+    """The installed package's version, as `--version` and the TUI header show it (§4, §7.1)."""
+    return importlib.metadata.version(DISTRIBUTION)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -102,6 +111,13 @@ def parser() -> argparse.ArgumentParser:
         "--no-config",
         action="store_true",
         help=f"ignore the settings file ({config_path()})",
+    )
+    # argparse prints and exits as it reaches it, before any file is read (§4).
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"jumble {installed_version()}",
+        help="print the version and exit",
     )
     sub = p.add_subparsers(dest="command")
     sub.add_parser(

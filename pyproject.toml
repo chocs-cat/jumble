@@ -1,5 +1,5 @@
 [project]
-name = "jumble"
+name = "jumble-cli"
 version = "0.1.0"
 description = "Random string generator — CLI and Textual TUI"
 readme = "README.md"
@@ -7,17 +7,30 @@ authors = [
     { name = "John Foland", email = "johnfoland@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "textual>=8.2.8",
     "tomlkit>=0.15.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/chocs-cat/jumble"
+Issues = "https://github.com/chocs-cat/jumble/issues"
+
 [project.scripts]
 jumble = "jumble:main"
 
 [build-system]
-requires = ["uv_build>=0.11.29,<0.12.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+# The distribution is jumble-cli, the import package jumble (DEC-24).
+[tool.hatch.build.targets.wheel]
+packages = ["src/jumble"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "README.md", "LICENSE"]
 
 [dependency-groups]
 dev = [

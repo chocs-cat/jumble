@@ -9,7 +9,30 @@ module, so the output is fit for secrets.
 
 ## Install
 
-Needs [uv](https://docs.astral.sh/uv/). From a checkout:
+jumble runs on macOS and Linux. Install it one of these ways; each gives you
+the `jumble` command.
+
+### Homebrew
+
+```sh
+brew install chocs-cat/tap/jumble
+```
+
+The formula lives in the `chocs-cat/tap` tap and brings its own Python.
+
+### PyPI
+
+```sh
+uv tool install jumble-cli
+```
+
+This installs the `jumble-cli` package from PyPI (`jumble` is taken there)
+into its own environment. It needs Python 3.13 or later;
+`pipx install jumble-cli` works the same way.
+
+### From a checkout
+
+With [uv](https://docs.astral.sh/uv/), in a clone of this repository:
 
 ```sh
 uv tool install .
@@ -45,6 +68,7 @@ jumble -n 32 -s digits tui      # the same, starting from 32 digits
 | `--json` | write one JSON object instead of lines (below) |
 | `--strength` | also print the alphabet size and bits per string to stderr |
 | `--no-config` | ignore the settings file (below) |
+| `--version` | print `jumble <version>` and exit |
 
 With no `-s` and no `--custom`, and no characters chosen in the settings
 file, jumble draws from `lower`, `upper`, and `digits`. A character that is
