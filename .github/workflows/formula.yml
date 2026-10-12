@@ -1,0 +1,86 @@
+name: Formula
+
+# Write the Homebrew formula for a version on PyPI, push it to
+# chocs-cat/homebrew-tap, then audit it, install it from the tap on macOS and
+# run it. The release workflow calls this after publishing; run it by hand to
+# redo a version's formula. Pushing needs the TAP_TOKEN secret (an organization
+# secret): a fine-grained token with Contents read/write on
+# chocs-cat/homebrew-tap alone.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "A version of jumble-cli on PyPI, like 0.1.0"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tap:
+    runs-on: ubuntu-latest
+    steps:
+      # The script from this workflow's commit; the resources from the
+      # release's uv.lock, so its tag goes alongside.
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
+          path: release
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Write the formula
+        # PyPI can take a little while to serve a new upload.
+        run: >-
+          uv run --script scripts/formula.py "$VERSION" --root release --wait 600
+          > "$RUNNER_TEMP/jumble.rb"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/checkout@v7
+        with:
+          repository: chocs-cat/homebrew-tap
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+      - name: Push it to the tap
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p tap/Formula
+          cp "$RUNNER_TEMP/jumble.rb" tap/Formula/jumble.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/jumble.rb
+          if git diff --cached --quiet; then
+            echo "the tap already has this formula"
+            exit 0
+          fi
+          git commit -q -m "jumble $VERSION"
+          # Other repos' releases push to the tap too; rebase over them.
+          for _ in 1 2 3; do
+            git pull -q --rebase && git push -q && exit 0
+            sleep 10
+          done
+          exit 1
+
+  install:
+    needs: tap
+    runs-on: macos-latest
+    steps:
+      - name: Audit it, install it from the tap and run it
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          brew tap chocs-cat/tap
+          brew audit --strict chocs-cat/tap/jumble
+          brew install chocs-cat/tap/jumble
+          test "$(jumble --version)" = "jumble $VERSION"
+          brew test chocs-cat/tap/jumble

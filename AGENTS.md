@@ -67,13 +67,33 @@ Releases are automated with release-please, from Conventional Commits.
   is the commit release-please reads.
 - Don't edit versions or `CHANGELOG.md`; release-please owns them. It keeps a
   release pull request open, and merging it tags `vX.Y.Z` and creates the
-  GitHub release; nothing goes to a registry. That merge is the maintainer's
-  call.
+  GitHub release. That merge is the maintainer's call.
+- A release is then published (DEC-24): the `publish` job of
+  `.github/workflows/release.yml` uploads the package to PyPI as `jumble-cli`
+  by trusted publishing and attaches the dists to the GitHub release, and the
+  **Formula** workflow (`.github/workflows/formula.yml`) writes
+  `Formula/jumble.rb` into `chocs-cat/homebrew-tap`, then audits it, installs
+  it from the tap on macOS, and runs it. The formula builds from the PyPI
+  sdist, with each runtime dependency at the version the release's `uv.lock`
+  pins.
+- To redo a version's formula, run the **Formula** workflow by hand with that
+  version, or locally, from a checkout of its tag:
+  `uv run --script scripts/formula.py X.Y.Z --root ../jumble-vX.Y.Z > jumble.rb`.
 - To force a version, add a `Release-As: X.Y.Z` footer to a commit. To fix the
   type or wording of an already-merged pull request, add a
   `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block with the corrected
   message to its body before the release pull request merges.
 - Never move or delete a pushed release tag. A bad release is fixed forward.
+
+One-time setup, for publishing to work:
+
+- The `pypi` GitHub environment (exists).
+- The `RELEASE_PLEASE_TOKEN` repository secret, so release pull requests run
+  CI without approval (exists).
+- The `TAP_TOKEN` organization secret: Contents read/write on
+  `chocs-cat/homebrew-tap` alone (exists).
+- A PyPI pending trusted publisher for `jumble-cli`: owner `chocs-cat`,
+  repository `jumble`, workflow `release.yml`, environment `pypi`.
 
 ## Conventions
 
