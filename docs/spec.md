@@ -131,6 +131,7 @@ upper bound and is reported as such (DEC-7).
 jumble                    in a terminal, open the TUI (§7); otherwise as below
 jumble [options]          generate and print strings
 jumble [options] tui      open the TUI, starting from these options (§7)
+jumble --version          print the version
 ```
 
 `jumble` with no arguments at all opens the TUI, exactly as `jumble tui`
@@ -156,6 +157,16 @@ list argparse parses (DEC-21).
 | `--json` | write JSON instead of lines (§4.2) |
 | `--strength` | also print the strength line to stderr (§4.3) |
 | `--no-config` | ignore the settings file (§5) |
+| `--version` | print `jumble <version>` and exit |
+
+`--version` writes `jumble <version>` and a newline to stdout and exits 0,
+where `<version>` is the installed package's version,
+`importlib.metadata.version("jumble-cli")` (DEC-24). It acts when argparse
+reaches it, before any settings file is read, so a broken file doesn't stop
+it: arguments after it are never looked at, while an error in one before it
+(`jumble -n x --version`) is reported as usual. It is an option of `jumble`,
+not of `tui`, so `jumble tui --version` is an unrecognized argument. Being an
+argument, it never opens the TUI.
 
 `-o`, `--json`, and `--strength` are errors with `tui` (§6): the message is
 `OPTION can't be used with tui`, naming the first one given of `--output`,
@@ -397,8 +408,8 @@ It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
 ```
 
 - Header: the title `jumble <version>`, the installed package's version
-  (`importlib.metadata.version("jumble")`), and as its dim subtitle exactly
-  the §4.3 line (`strength_line`) for the current controls, updated on every
+  as `--version` prints it (§4), and as its dim subtitle exactly the §4.3
+  line (`strength_line`) for the current controls, updated on every
   change to any control. Textual's header joins them with its own ` — `.
 - Controls pane: length and count inputs, a scrollable list of every named
   set in canonical order to check or uncheck, the preview of the set under

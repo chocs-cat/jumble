@@ -317,3 +317,24 @@ main screen doesn't, and two deep paths can differ only in the part cut
 away. Added 2026-10-11, from issue #19.
 
 *Where:* docs/spec.md §7.4.
+
+## DEC-24: Published as `jumble-cli` on PyPI and `jumble` in the chocs-cat tap (2026-10)
+
+Releases go to PyPI and to the chocs-cat Homebrew tap as well as GitHub, so
+`brew install chocs-cat/tap/jumble` works (issue #34), following
+chocs-cat/tack: a trusted-publishing job uploads to PyPI, and a formula
+built from the PyPI sdist, with each runtime dependency at the version the
+release's `uv.lock` pins, goes to `chocs-cat/homebrew-tap`. The PyPI
+distribution is `jumble-cli`, because `jumble` there is an unrelated 0.0.1;
+the command, the import package, and the Homebrew formula stay `jumble`,
+since homebrew/core has none. 0.1.0 is the first published version, so it
+reaches GitHub, PyPI, and the tap together.
+
+The build backend moves from `uv_build` to `hatchling`. Homebrew installs a
+formula's resources with `pip --no-binary=:all:` and build isolation, so the
+backend itself is built from source: `uv_build` is a Rust crate, `hatchling`
+pure Python, and tack's and corral's formulas already install with it. The
+formula's test runs `jumble --version`, which the command lacked, so it gains
+one, printing the version the TUI header shows.
+
+*Where:* docs/spec.md §4, §7.1; README.md *Install*; AGENTS.md *Releases*.
