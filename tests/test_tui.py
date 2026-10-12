@@ -59,7 +59,7 @@ VALID = "62 characters · 95.3 bits per string"
 async def test_header_at_start() -> None:
     app = JumbleApp()
     async with app.run_test():
-        assert app.title == f"jumble {version('jumble')}"
+        assert app.title == f"jumble {version('jumble-cli')}"
         assert app.sub_title == VALID
         assert banner(app) is None
         assert len(results(app)) == 1

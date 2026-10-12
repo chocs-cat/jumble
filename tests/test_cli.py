@@ -1,4 +1,5 @@
 import errno
+import importlib.metadata
 import io
 import json
 import os
@@ -777,3 +778,48 @@ def test_help_says_bare_jumble_opens_the_tui(capsys: pytest.CaptureFixture[str])
         "jumble alone, typed in a terminal, opens the interactive generator, as jumble tui "
         "does; piped, in a script, or with any option, it prints." in out
     )
+
+
+def test_version_prints_the_installed_version(capsys: pytest.CaptureFixture[str]) -> None:
+    # The literal name, not DISTRIBUTION, so a wrong constant fails here (§4, DEC-24).
+    with pytest.raises(SystemExit) as exit:
+        main(["--version"])
+    assert exit.value.code == 0
+    assert capsys.readouterr() == (f"jumble {importlib.metadata.version('jumble-cli')}\n", "")
+
+
+def test_version_reads_no_settings_file(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # argparse acts on it before main reads the file, so a broken one can't stop it (§4).
+    config_file.write_text("length = ")
+    with pytest.raises(SystemExit) as exit:
+        main(["--version"])
+    assert exit.value.code == 0
+    assert capsys.readouterr() == (f"jumble {importlib.metadata.version('jumble-cli')}\n", "")
+
+
+@pytest.mark.parametrize("argv", [["-n", "x", "--version"], ["tui", "--version"]])
+def test_version_after_a_bad_argument_or_tui_is_an_error(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    # An error before it is reported; tui has no --version of its own (§4).
+    with pytest.raises(SystemExit) as exit:
+        main(argv)
+    assert exit.value.code == 2
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert "jumble" in err and "error:" in err
+
+
+def test_version_in_a_terminal_prints_and_opens_no_tui(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Being an argument, it never takes bare jumble's TUI route (§4, DEC-21).
+    launched = Launched(monkeypatch)
+    terminals(monkeypatch)
+    with pytest.raises(SystemExit) as exit:
+        main(["--version"])
+    assert exit.value.code == 0
+    assert launched.apps == []
+    assert capsys.readouterr().out == f"jumble {importlib.metadata.version('jumble-cli')}\n"

@@ -45,6 +45,7 @@ jumble -n 32 -s digits tui      # the same, starting from 32 digits
 | `--json` | write one JSON object instead of lines (below) |
 | `--strength` | also print the alphabet size and bits per string to stderr |
 | `--no-config` | ignore the settings file (below) |
+| `--version` | print `jumble <version>` and exit |
 
 With no `-s` and no `--custom`, and no characters chosen in the settings
 file, jumble draws from `lower`, `upper`, and `digits`. A character that is
