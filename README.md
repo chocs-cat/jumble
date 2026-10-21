@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
-  <img alt="jumble" src="docs/logo-light.svg" height="64">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chocs-cat/jumble/master/docs/logo-dark.svg">
+  <img alt="jumble" src="https://raw.githubusercontent.com/chocs-cat/jumble/master/docs/logo-light.svg" height="64">
 </picture>
 
 jumble generates random strings — passwords, tokens, test data — from the
@@ -253,7 +253,7 @@ why. A save doesn't jumble: the strings stay until the next `g`.
 it saves nothing and says so. The file holds the same bytes as `jumble`'s
 output: UTF-8, one string per line.
 
-![The jumble TUI: controls on the left, ten strings on the right](docs/tui.svg)
+![The jumble TUI: controls on the left, ten strings on the right](https://raw.githubusercontent.com/chocs-cat/jumble/master/docs/tui.svg)
 
 ## Development
 
@@ -265,4 +265,4 @@ make fix     # apply formatting and safe lint fixes
 
 ## License
 
-MIT; see [LICENSE](LICENSE).
+MIT; see [LICENSE](https://github.com/chocs-cat/jumble/blob/master/LICENSE).

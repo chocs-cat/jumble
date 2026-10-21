@@ -9,10 +9,45 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    # Decides whether `check` runs. The docs filter lives here, not in a
+    # workflow-level paths-ignore: a skipped workflow never reports `check`,
+    # so a docs-only pull request would wait on the required check forever.
+    name: changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PR" ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Both sides of a rename count, so moving code into docs/ still runs.
+          files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          # docs/spec.md counts as code: tests/test_config.py reads it.
+          if grep -qv '^docs/' <<<"$files" || grep -qx 'docs/spec.md' <<<"$files"; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          else
+            echo code=false >> "$GITHUB_OUTPUT"
+          fi
+
   check:
     # The job name is the required status check on the default branch, so
     # rename it only together with the branch protection.
     name: check
+    needs: changes
+    # A job skipped by its `if:` reports success, which lets a docs-only pull
+    # request merge. Anything but an explicit `false` runs it, so a failed
+    # `changes` job still runs the checks instead of skipping them.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
