@@ -508,8 +508,8 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
     too short for the whole dialog, only the form scrolls, so Save and
     Cancel never need a scroll to reach (DEC-23). When it is tall enough,
     the dialog is only as tall as its contents: Save and Cancel sit on the
-    row after the form's last, with no blank rows between, and the dialog
-    stays centered. Both hold as the terminal is resized with the screen
+    row after the form's last row, with no blank rows between, and the
+    dialog stays centered. Both hold as the terminal is resized with the screen
     open (DEC-26).
 
 Either route writes to the §5.1 path as it resolves at the time of the save,
