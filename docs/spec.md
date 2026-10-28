@@ -506,7 +506,11 @@ Two routes write the settings file (§5.3) and confirm its path in a toast:
     onto as many lines as it needs when it is wider than the dialog, never
     cut short. The path and the buttons always show: when the terminal is
     too short for the whole dialog, only the form scrolls, so Save and
-    Cancel never need a scroll to reach (DEC-23).
+    Cancel never need a scroll to reach (DEC-23). When it is tall enough,
+    the dialog is only as tall as its contents: Save and Cancel sit on the
+    row after the form's last, with no blank rows between, and the dialog
+    stays centered. Both hold as the terminal is resized with the screen
+    open (DEC-26).
 
 Either route writes to the §5.1 path as it resolves at the time of the save,
 even when the TUI was started with `--no-config`. A successful save's toast
