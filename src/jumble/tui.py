@@ -273,7 +273,7 @@ class JumbleApp(App[None]):
     #numbers { height: auto; }
     #numbers Input { width: 1fr; }
     #charsets { height: 12; }
-    #preview { height: 4; }
+    #preview { height: 4; padding: 0 1; }
     #options { grid-size: 2; height: auto; }
     #options Checkbox { width: 1fr; }
     #results { width: 1fr; height: 1fr; border: none; }
