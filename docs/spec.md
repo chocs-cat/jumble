@@ -399,8 +399,8 @@ It opens with `jumble tui` (with options before `tui`, §7.5), or with bare
  Sets                                │ pQ7rStUvW8xYz3Ab
   [x] lower                          │ …
   [ ] greek  …                       │
- ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθ    │   ← set preview (§7.6)
- ικλμνξοπρστυφχψω                    │
+  ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθ   │   ← set preview (§7.6)
+  ικλμνξοπρστυφχψω                   │
  Custom [                ]           │
  [ ] No look-alikes  [ ] One from each set
  [ ] No repeats      [ ] All unique  │
@@ -541,12 +541,16 @@ subtitle describes the alphabet. `space`, whose one character can't be seen,
 shows `(the space character)` instead.
 
 - **Preview.** Under the Sets list, a preview four lines tall shows the
-  characters of the set under the list's cursor; four lines hold the largest
-  set at the controls pane's width. The cursor starts on the first set,
-  `lower`, and the preview follows it as it moves, by key or by click;
-  checking or unchecking a set doesn't move it. The preview is part of the
-  controls (§7.1), so the settings form has one too, following the form's
-  own list (§7.4). It is text only: it takes no focus and has no keys.
+  characters of the set under the list's cursor. It is inset one column at
+  each side, so its text starts inside the left border of the Sets list and
+  the Custom input around it, and has no border and no padding above or
+  below, since at 100 × 30 the pane has no row to spare (§7.1, DEC-25). Four
+  lines hold the largest set at the width that leaves. The cursor starts on
+  the first set, `lower`, and the preview follows it as it moves, by key or
+  by click; checking or unchecking a set doesn't move it. The preview is
+  part of the controls (§7.1), so the settings form has one too, following
+  the form's own list (§7.4). It is text only: it takes no focus and has no
+  keys.
 - **Help screen.** `?` opens it over the main screen: a dialog titled `Help`
   listing every named set in canonical order, each as its name and size on
   one line (`greek · 48 characters`, `space · 1 character`) with its

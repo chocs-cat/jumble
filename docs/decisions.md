@@ -338,3 +338,19 @@ formula's test runs `jumble --version`, which the command lacked, so it gains
 one, printing the version the TUI header shows.
 
 *Where:* docs/spec.md §4, §7.1; README.md *Install*; AGENTS.md *Releases*.
+
+## DEC-25: The set preview is inset one column, inside the controls' borders (2026-10)
+
+The set preview (DEC-22) began at the controls pane's left edge, under the
+left border of the bordered Sets list and Custom input, so it read as
+outside them (issue #31). Now one column of padding at each side starts its
+text in the first column inside those borders. Insetting it to the list's
+checkboxes (two columns) or to the `Sets` and `Custom` titles and the typed
+custom text (three) were the alternatives; each costs more width, and the
+first column inside the borders is the one edge the boxes share. A
+border or vertical padding is ruled out: at 100 × 30 the pane has no spare
+row. Four lines still hold `box` and `emoji-faces` at the 51 columns left on
+the main screen and the 50 in the settings form. Added 2026-10-28, from
+issue #31.
+
+*Where:* docs/spec.md §7.1, §7.6.
