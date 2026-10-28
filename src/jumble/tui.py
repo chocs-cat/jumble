@@ -151,9 +151,9 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
         self.path = path
 
     def compose(self) -> ComposeResult:
-        # The path, wrapped whole, and the buttons always show; the form takes
-        # the rows left between them and scrolls when they are too few (§7.4,
-        # DEC-23).
+        # The path, wrapped whole, and the buttons always show (DEC-23). The
+        # form is as tall as its contents, up to the rows they leave, and
+        # scrolls when those are too few; `fit` sets that cap (§7.4, DEC-26).
         with Vertical(id="dialog") as dialog:
             dialog.border_title = "Settings"
             # A path can hold `[`, so it is shown as text, not markup.
@@ -163,6 +163,22 @@ class SettingsScreen(ModalScreen[tuple[Settings, Path] | None]):
             with Horizontal(id="buttons"):
                 yield Button("Save", id="save", variant="primary")
                 yield Button("Cancel", id="cancel")
+
+    def on_resize(self) -> None:
+        # Every resize, the first on opening included, so the cap follows the
+        # terminal. The path's height is known only after layout (DEC-26).
+        self.call_after_refresh(self.fit)
+
+    def fit(self) -> None:
+        """Cap the form at the rows the path and the buttons leave (§7.4, DEC-26)."""
+        dialog = self.query_one("#dialog")
+        spare = (
+            self.size.height
+            - dialog.styles.gutter.height
+            - self.query_one("#path").outer_size.height
+            - self.query_one("#buttons").outer_size.height
+        )
+        self.query_one("#form").styles.max_height = max(spare, 1)
 
     # The App's handlers would check the main screen's controls, move its
     # preview, and `enter` would jumble there (§7.2, §7.6): the form's
@@ -266,7 +282,7 @@ class JumbleApp(App[None]):
     .set-heading { text-style: bold; }
     .set-body { margin-bottom: 1; }
     #dialog { width: 58; height: auto; max-height: 100%; border: thick $primary; padding: 0 1; }
-    #form { height: 1fr; }
+    #form { height: auto; }
     #path { color: $text-muted; }
     #buttons { height: auto; align-horizontal: right; }
     #buttons Button { margin-left: 1; }
