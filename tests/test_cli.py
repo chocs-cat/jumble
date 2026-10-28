@@ -241,6 +241,30 @@ def test_unwritable_stdout(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> 
     assert err.getvalue() == "jumble: error: can't write stdout: No space left on device\n"
 
 
+def test_pytest_s_leaves_stdout_open() -> None:
+    # Under `pytest -s`, a test that leaves a closed stream as sys.stdout makes
+    # pytest's final flush fail and exit 1 (#23). Run the tests that swap or
+    # patch stdout that way, uncaptured, and check pytest still exits 0.
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-s",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            __file__,
+            "-k",
+            "unwritable_stdout or terminal or tui or argv",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 JSON_KEYS = ["strings", "alphabet_size", "strength_bits", "strength_is_bound", "settings"]
 
 
