@@ -1142,6 +1142,51 @@ async def test_only_the_form_scrolls_on_a_short_terminal(long_path: Path) -> Non
         assert not long_path.exists()
 
 
+async def settle(pilot: Pilot[None]) -> None:
+    """Let a resize reach the layout and the form's cap (DEC-26)."""
+    await pilot.pause()
+    await pilot.pause()
+
+
+def fits(app: JumbleApp, screen: SettingsScreen) -> bool:
+    """No blank rows above the buttons, and the dialog shorter than the screen and centered."""
+    (options, buttons, dialog) = regions(screen, "#options", "#buttons", "#dialog")
+    height = app.screen.region.height
+    return (
+        buttons.y == options.bottom
+        and dialog.height < height
+        and dialog.y == (height - dialog.height) // 2
+    )
+
+
+# On a tall terminal the dialog is only as tall as its contents (§7.4, DEC-26).
+
+
+async def test_the_dialog_fits_its_contents_on_a_tall_terminal(long_path: Path) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        screen = await open_settings(pilot)
+        await settle(pilot)
+        assert "".join(path_lines(screen)) == str(long_path)
+        assert fits(app, screen)
+
+
+async def test_the_dialog_refits_as_the_terminal_is_resized(long_path: Path) -> None:
+    app = JumbleApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        screen = await open_settings(pilot)
+        await settle(pilot)
+        assert fits(app, screen)
+        await pilot.resize_terminal(100, 16)
+        await settle(pilot)
+        assert buttons_show(app, screen)
+        form = screen.query_one("#form")
+        assert form.virtual_size.height > form.region.height
+        await pilot.resize_terminal(100, 40)
+        await settle(pilot)
+        assert fits(app, screen)
+
+
 # Every label shows whole at 100 by 30, `One from each set` included (§7.1, #12).
 
 
