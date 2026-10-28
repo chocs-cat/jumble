@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/chocs-cat/jumble/compare/v0.1.0...v0.1.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **tui:** inset the set preview inside the controls' borders ([#45](https://github.com/chocs-cat/jumble/issues/45)) ([6db9906](https://github.com/chocs-cat/jumble/commit/6db99065f78873fce9aea19328005cc7cd4a728f)), closes [#31](https://github.com/chocs-cat/jumble/issues/31)
+
 ## 0.1.0 (2026-10-12)
 
 
