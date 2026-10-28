@@ -360,10 +360,10 @@ issue #31.
 The layout that pins the settings dialog's path and buttons (DEC-23) also
 stretched the form to the terminal's height, so on a terminal taller than
 the dialog needs, blank rows sat between the last option and Save and
-Cancel: five at 100 × 40 with a two-line path (issue #29). Now the dialog is only as tall as its
-contents, and the pinning holds when it isn't tall enough. Filling the
-height was the alternative; it leaves the buttons away from the form they
-act on, for no gain.
+Cancel: five at 100 × 40 with a two-line path (issue #29). Now the dialog
+is only as tall as its contents, and the pinning holds when it isn't tall
+enough. Filling the height was the alternative; it leaves the buttons away
+from the form they act on, for no gain.
 
 No Textual 8.2.8 stylesheet does both (#29 lists the shapes probed), so the
 form's height follows its contents up to a cap the screen sets: the rows the
