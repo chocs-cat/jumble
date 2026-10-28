@@ -244,8 +244,9 @@ like any other character.
 
 The settings screen shows the file's path in full, wrapped when it's long,
 and keeps Save and Cancel in view: on a short terminal only the form
-scrolls. The keys above don't act while it's open. In its text
-boxes `enter` saves, as its Save button does. Save checks the form as the
+scrolls, and on a tall one the screen is only as tall as its contents. The
+keys above don't act while it's open. In its text boxes `enter` saves, as
+its Save button does. Save checks the form as the
 banner would, and while it can't produce strings, saves nothing and says
 why. A save doesn't jumble: the strings stay until the next `g`.
 
