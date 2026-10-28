@@ -1177,8 +1177,8 @@ PREVIEWED = ("symbols", "space", "emoji-faces", "greek")
 
 
 def preview(node: Any) -> str:
-    """The preview's text under `node` as it draws, its wrapped lines joined."""
-    return "".join(line.rstrip() for line in rendered(node.query_one("#preview")).splitlines())
+    """The preview's text under `node` as it draws, its wrapped lines joined, its inset stripped."""
+    return "".join(line.strip() for line in rendered(node.query_one("#preview")).splitlines())
 
 
 def test_characters_are_the_set_as_defined() -> None:
@@ -1217,20 +1217,38 @@ async def test_the_preview_follows_the_cursor_by_key() -> None:
         assert preview(app.screen) == characters("box")
 
 
+async def test_the_preview_is_inset_one_column() -> None:
+    # Its text starts in the first column inside the Sets list's left border,
+    # and stops one short of the pane's right edge (§7.6, DEC-25).
+    app = JumbleApp()
+    async with app.run_test(size=SIZE) as pilot:
+        # The main screen first, uncovered, then the form's own preview.
+        for in_form in (False, True):
+            screen = await open_settings(pilot) if in_form else app.screen
+            shown = screen.query_one("#preview", Static)
+            region = shown.region
+            assert region.x == screen.query_one("#charsets").region.x
+            assert shown.content_region.x == region.x + 1
+            assert shown.content_region.width == region.width - 2
+            assert rendered(shown).splitlines()[0].rstrip() == " " + string.ascii_lowercase
+
+
 async def test_four_lines_hold_the_largest_sets() -> None:
     app = JumbleApp()
     async with app.run_test(size=SIZE) as pilot:
-        sets = app.query_one("#charsets", SelectionList)
-        shown = app.query_one("#preview", Static)
-        for name in ("emoji-faces", "box"):
-            sets.highlighted = list(CHARSETS).index(name)
-            await pilot.pause()
-            lines = rendered(shown).splitlines()
-            assert shown.region.height == 4, name
-            assert len(lines) == 4, name
-            # The fourth line holds the last of the set: nothing is cut.
-            assert lines[3].strip(), name
-            assert preview(app.screen) == CHARSETS[name], name
+        for in_form in (False, True):
+            screen = await open_settings(pilot) if in_form else app.screen
+            sets = screen.query_one("#charsets", SelectionList)
+            shown = screen.query_one("#preview", Static)
+            for name in ("emoji-faces", "box"):
+                sets.highlighted = list(CHARSETS).index(name)
+                await pilot.pause()
+                lines = rendered(shown).splitlines()
+                assert shown.region.height == 4, name
+                assert len(lines) == 4, name
+                # The fourth line holds the last of the set: nothing is cut.
+                assert lines[3].strip(), name
+                assert preview(screen) == CHARSETS[name], name
 
 
 async def test_the_preview_follows_a_click() -> None:
