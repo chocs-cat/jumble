@@ -123,6 +123,12 @@ One-time setup, for publishing to work:
   test a stdin that isn't one, and `main([])` prints even under `pytest -s`.
   A test of the terminal case sets both streams itself (`terminals` in
   `tests/test_cli.py`).
+- Don't reassign `sys.stdout` in a test that takes `capsys`. The autouse
+  fixtures request `monkeypatch`, so it is set up before `capsys` and its
+  undo puts back capsys's stream after capsys has closed it; `pytest -s` then
+  exits 1 (#23). Patch the stream's attributes instead
+  (`monkeypatch.setattr(sys.stdout, "isatty", …)`), or leave `capsys` out.
+  `test_pytest_s_leaves_stdout_open` guards this.
 - Judge the gate by its exit code: don't pipe `make check` into `tail` or
   `head`, which hides a failure. After a hand mutation check, clear
   `__pycache__` (or set `PYTHONDONTWRITEBYTECODE=1`) before the next run:

@@ -232,12 +232,37 @@ class FullDisk(io.BytesIO):
 
 
 @pytest.mark.parametrize("argv", [[], ["-o", "-"]])
-def test_unwritable_stdout(
-    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_unwritable_stdout(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    # No `capsys` here: monkeypatch's undo would put back capsys's closed stdout (#23).
+    err = io.StringIO()
     monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(FullDisk()))
+    monkeypatch.setattr(sys, "stderr", err)
     assert main(argv) == 1
-    assert capsys.readouterr().err == "jumble: error: can't write stdout: No space left on device\n"
+    assert err.getvalue() == "jumble: error: can't write stdout: No space left on device\n"
+
+
+def test_pytest_s_leaves_stdout_open() -> None:
+    # Under `pytest -s`, a test that leaves a closed stream as sys.stdout makes
+    # pytest's final flush fail and exit 1 (#23). Run the tests that swap or
+    # patch stdout that way, uncaptured, and check pytest still exits 0.
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-s",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            __file__,
+            "-k",
+            "unwritable_stdout or terminal or tui or argv",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
 JSON_KEYS = ["strings", "alphabet_size", "strength_bits", "strength_is_bound", "settings"]
@@ -639,10 +664,9 @@ def test_file_errors_name_the_file_and_key(
 
 
 class Tty:
-    """A stand-in for a standard stream that says whether it is a terminal.
+    """A stand-in for stdin that says whether it is a terminal.
 
-    Everything but `isatty` goes to the stream it wraps, so a wrapped stdout
-    is still what `capsys` captures.
+    Everything but `isatty` goes to the stream it wraps.
     """
 
     def __init__(self, stream: Any, tty: bool) -> None:
@@ -657,7 +681,9 @@ class Tty:
 
 def terminals(monkeypatch: pytest.MonkeyPatch, stdin: bool = True, stdout: bool = True) -> None:
     monkeypatch.setattr(sys, "stdin", Tty(io.StringIO(""), stdin))
-    monkeypatch.setattr(sys, "stdout", Tty(sys.stdout, stdout))
+    # Patch the stream already there rather than replace it: monkeypatch's undo
+    # would otherwise put back capsys's closed stdout (#23).
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: stdout)
 
 
 def test_the_fixture_keeps_stdin_off_the_terminal() -> None:
@@ -755,7 +781,7 @@ def test_a_closed_stdin_is_not_a_terminal(
     # `jumble <&-` leaves sys.stdin None: it prints, rather than crashing.
     launched = Launched(monkeypatch)
     monkeypatch.setattr(sys, "stdin", None)
-    monkeypatch.setattr(sys, "stdout", Tty(sys.stdout, True))
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     code, lines, err = run([], capsys)
     assert (code, err, launched.apps) == (0, "", [])
     assert [len(line) for line in lines] == [16]
