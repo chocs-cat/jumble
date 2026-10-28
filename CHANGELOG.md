@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/chocs-cat/jumble/compare/v0.1.1...v0.1.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **tui:** fit the settings dialog to its contents on a tall terminal ([#49](https://github.com/chocs-cat/jumble/issues/49)) ([1271ee1](https://github.com/chocs-cat/jumble/commit/1271ee1b3a28e535c7b31a0367650b8097520bd4)), closes [#29](https://github.com/chocs-cat/jumble/issues/29)
+
 ## [0.1.1](https://github.com/chocs-cat/jumble/compare/v0.1.0...v0.1.1) (2026-10-28)
 
 
