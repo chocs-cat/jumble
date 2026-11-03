@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   changes:
-    # Decides whether `check` runs. The docs filter lives here, not in a
+    # Decides whether `check` runs. The path filter lives here, not in a
     # workflow-level paths-ignore: a skipped workflow never reports `check`,
-    # so a docs-only pull request would wait on the required check forever.
+    # so a pull request it skips would wait on the required check forever.
     name: changes
     runs-on: ubuntu-latest
     permissions:
@@ -24,6 +24,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          # Paths nothing in the check command or the build reads, as an
+          # extended regex: a pull request that touches only these skips
+          # `check`. Never list this workflow; a change to it must run.
+          # docs/spec.md stays out: tests/test_config.py reads it.
+          SKIP: '^(docs/(decisions\.md|logo-(light|dark)\.svg|tui\.svg)$|AGENTS\.md$|CLAUDE\.md$|CHANGELOG\.md$|\.agents/repokit\.toml$|\.github/dependabot\.yml$|\.github/workflows/(formula|pr-title|release)\.yml$)'
         run: |
           if [ -z "$PR" ]; then
             echo code=true >> "$GITHUB_OUTPUT"
@@ -32,8 +37,7 @@ jobs:
           # Both sides of a rename count, so moving code into docs/ still runs.
           files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate \
             --jq '.[] | .filename, (.previous_filename // empty)')
-          # docs/spec.md counts as code: tests/test_config.py reads it.
-          if grep -qv '^docs/' <<<"$files" || grep -qx 'docs/spec.md' <<<"$files"; then
+          if grep -qvE "$SKIP" <<<"$files"; then
             echo code=true >> "$GITHUB_OUTPUT"
           else
             echo code=false >> "$GITHUB_OUTPUT"
